@@ -1,10 +1,17 @@
-package hu.unideb.inf.kliens;
+package hu.unideb.inf.kliens.controller;
 
+import hu.unideb.inf.kliens.model.Model;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 
 public class HelloController
 {
+
+    private Model model;
+
+    public void setModel(Model model) {
+        this.model = model;
+    }
     @FXML
     private Label welcomeText;
 
@@ -12,5 +19,6 @@ public class HelloController
     protected void onHelloButtonClick()
     {
         welcomeText.setText("Welcome to JavaFX Application!");
+        System.out.println(model.getItem().getName());
     }
 }
