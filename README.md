@@ -128,7 +128,7 @@ mvn --projects warehouse-javafx javafx:run
 
 | Funkció | Állapot (Backend) | Állapot (Frontend) | Prioritás |
 | :--- | :--- | :--- | :--- |
-| **Rendszertervezés & Specifikáció** | ☑️ Kész | ☑️ Kész | Magas |
+| **Rendszertervezés & Specifikáció** | 🚧 Folyamatban  | 🚧 Folyamatban | Magas |
 | **Multi-module Maven Architektúra** | 🚧 Folyamatban | 🚧 Folyamatban | Magas |
 | **Adatbázis Séma & Migrációk (Flyway)** | 📅 Tervezve | 📅 Tervezve | Magas |
 | **Felhasználókezelés & Hitelesítés (JWT / RBAC)** | 📅 Tervezve | 📅 Tervezve | Magas |
