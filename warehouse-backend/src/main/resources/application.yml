@@ -1,0 +1,4 @@
+# Alkalmazás konfiguráció (profilok: dev, prod, test)
+spring:
+  application:
+    name: warehouse-backend

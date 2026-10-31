@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="hu" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::main-body}, ~{::title})}">
+<head>
+    <title>Smart WMS - Raktár Dashboard</title>
+</head>
+<body>
+<div th:fragment="main-body">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-0">Raktár Felügyeleti Dashboard</h3>
+            <p class="text-muted small mb-0">Valós idejű telephelyi és készletkapacitás statisztikák</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Nyomtatás / PDF
+            </button>
+            <a th:href="@{/admin/inventory/new}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i> Új Bevételezés
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-medium">Összes Terméktípus</span>
+                        <h4 class="fw-bold mt-1 mb-0" th:text="${totalProducts ?: '142'}">142</h4>
+                    </div>
+                    <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-3">
+                        <i class="bi bi-boxes fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-medium">Raktár Telítettség</span>
+                        <h4 class="fw-bold mt-1 mb-0" th:text="${occupancyRate ?: '78%'}">78%</h4>
+                    </div>
+                    <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-3">
+                        <i class="bi bi-pie-chart fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-medium">Kritikus Készlet</span>
+                        <h4 class="fw-bold mt-1 mb-0 text-danger" th:text="${criticalStockCount ?: '5'}">5</h4>
+                    </div>
+                    <div class="p-3 bg-danger bg-opacity-10 text-danger rounded-3">
+                        <i class="bi bi-exclamation-triangle fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-medium">Folyamatban lévő Taskok</span>
+                        <h4 class="fw-bold mt-1 mb-0 text-success" th:text="${activeTasks ?: '12'}">12</h4>
+                    </div>
+                    <div class="p-3 bg-success bg-opacity-10 text-success rounded-3">
+                        <i class="bi bi-arrow-repeat fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm rounded-3 p-3">
+                <h5 class="fw-bold mb-3">Zónák Terheltsége (Súly & Térfogat)</h5>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small fw-medium mb-1">
+                        <span>A-Zóna (Száraz raktár - Normál)</span>
+                        <span class="text-muted">4500 / 6000 kg (75%)</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 75%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small fw-medium mb-1">
+                        <span>B-Zóna (Hűtött raktár)</span>
+                        <span class="text-danger fw-bold">1920 / 2000 kg (96% - Kritikus!)</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-danger" role="progressbar" style="width: 96%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small fw-medium mb-1">
+                        <span>C-Zóna (Veszélyes anyagok)</span>
+                        <span class="text-muted">320 / 1500 kg (21%)</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 21%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+            <div class="card border-0 shadow-sm rounded-3 p-3">
+                <h5 class="fw-bold mb-3">Készlet Riasztások (FEFO / Min. Készlet)</h5>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-bold">Fékfolyadék DOT4 (SKU-1092)</div>
+                            <span class="badge bg-danger-subtle text-danger">Készlet: 3 db (Min: 10 db)</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary">Rendelés</button>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-bold">Szintetikus Motorolaj 5W30 (Lot-44)</div>
+                            <span class="badge bg-warning-subtle text-warning">Lejár: 14 napon belül</span>
+                        </div>
+                        <span class="text-muted small">Polc: A-02-1</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
