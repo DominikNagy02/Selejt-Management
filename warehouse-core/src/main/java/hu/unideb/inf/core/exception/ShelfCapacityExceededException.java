@@ -1,20 +1,27 @@
 package hu.unideb.inf.core.exception;
 
+import java.math.BigDecimal;
+
 public class ShelfCapacityExceededException extends RuntimeException {
 
     private final String shelfCode;
-    private final double maxLimit;
-    private final double calculatedValue;
+    private final BigDecimal maxLimit;
+    private final BigDecimal calculatedValue;
     private final String unit;
 
-    public ShelfCapacityExceededException(String shelfCode, double maxLimit, double calculatedValue, String unit) {
+    public ShelfCapacityExceededException(
+            String shelfCode,
+            BigDecimal maxLimit,
+            BigDecimal calculatedValue,
+            String unit
+    ) {
         this(shelfCode, maxLimit, calculatedValue, unit, buildMessage(shelfCode, maxLimit, calculatedValue, unit));
     }
 
     public ShelfCapacityExceededException(
             String shelfCode,
-            double maxLimit,
-            double calculatedValue,
+            BigDecimal maxLimit,
+            BigDecimal calculatedValue,
             String unit,
             String message
     ) {
@@ -25,10 +32,15 @@ public class ShelfCapacityExceededException extends RuntimeException {
         this.unit = unit;
     }
 
-    private static String buildMessage(String shelfCode, double maxLimit, double calculatedValue, String unit) {
+    private static String buildMessage(
+            String shelfCode,
+            BigDecimal maxLimit,
+            BigDecimal calculatedValue,
+            String unit
+    ) {
         return String.format(
-                "A polc (%s) kapacitása meghaladná a maximális %.2f %s értéket. Számított új érték: %.2f %s.",
-                shelfCode, maxLimit, unit, calculatedValue, unit
+                "A polc (%s) kapacitása meghaladná a maximális %s %s értéket. Számított új érték: %s %s.",
+                shelfCode, maxLimit.toPlainString(), unit, calculatedValue.toPlainString(), unit
         );
     }
 
@@ -36,11 +48,11 @@ public class ShelfCapacityExceededException extends RuntimeException {
         return shelfCode;
     }
 
-    public double getMaxLimit() {
+    public BigDecimal getMaxLimit() {
         return maxLimit;
     }
 
-    public double getCalculatedValue() {
+    public BigDecimal getCalculatedValue() {
         return calculatedValue;
     }
 
@@ -48,4 +60,3 @@ public class ShelfCapacityExceededException extends RuntimeException {
         return unit;
     }
 }
-

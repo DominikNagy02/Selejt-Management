@@ -4,6 +4,8 @@ import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,15 +20,20 @@ class CapacityValidatorTest {
     @BeforeEach
     void setUp() {
         validator = new CapacityValidator();
-        defaultShelf = new ShelfLoad("S-04-12", 320.0, 2.0, 500.0, 5.0);
-        defaultItem = new ItemSize(2.0, 0.05);
+        defaultShelf = new ShelfLoad(
+                "S-04-12",
+                new BigDecimal("320.000"),
+                new BigDecimal("2.000"),
+                new BigDecimal("500.000"),
+                new BigDecimal("5.000")
+        );
+        defaultItem = new ItemSize(new BigDecimal("2.000"), new BigDecimal("0.050"));
     }
 
     // F2.5: Súlykorlát túllépése
     @Test
     void validateShouldRejectWeightLimitViolation() {
-        // Új súly: 320 + (2.0 * 110) = 540 kg > 500 kg; Új térfogat: 2.0 + (0.05 * 110) = 7.5 (állítsuk kisebbre a térfogatot, hogy csak a súly lépje túl)
-        ItemSize heavyItem = new ItemSize(2.0, 0.01);
+        ItemSize heavyItem = new ItemSize(new BigDecimal("2.000"), new BigDecimal("0.010"));
 
         ShelfCapacityExceededException ex = assertThrows(
                 ShelfCapacityExceededException.class,
@@ -34,8 +41,8 @@ class CapacityValidatorTest {
         );
 
         assertEquals("S-04-12", ex.getShelfCode());
-        assertEquals(500.0, ex.getMaxLimit());
-        assertEquals(540.0, ex.getCalculatedValue());
+        assertEquals(0, new BigDecimal("500.000").compareTo(ex.getMaxLimit()));
+        assertEquals(0, new BigDecimal("540.000").compareTo(ex.getCalculatedValue()));
         assertEquals("kg", ex.getUnit());
         assertTrue(ex.getMessage().contains("kg"));
     }
@@ -43,8 +50,7 @@ class CapacityValidatorTest {
     // F2.6: Térfogatkorlát túllépése (és mindkettő túllépése)
     @Test
     void validateShouldRejectVolumeLimitViolation() {
-        // Új súly: 320 + (1.0 * 50) = 370 kg <= 500 kg; Új térfogat: 2.0 + (0.1 * 50) = 7.0 m³ > 5.0 m³
-        ItemSize bulkyItem = new ItemSize(1.0, 0.1);
+        ItemSize bulkyItem = new ItemSize(new BigDecimal("1.000"), new BigDecimal("0.100"));
 
         ShelfCapacityExceededException ex = assertThrows(
                 ShelfCapacityExceededException.class,
@@ -52,15 +58,15 @@ class CapacityValidatorTest {
         );
 
         assertEquals("S-04-12", ex.getShelfCode());
-        assertEquals(5.0, ex.getMaxLimit());
-        assertEquals(7.0, ex.getCalculatedValue());
+        assertEquals(0, new BigDecimal("5.000").compareTo(ex.getMaxLimit()));
+        assertEquals(0, new BigDecimal("7.000").compareTo(ex.getCalculatedValue()));
         assertEquals("m³", ex.getUnit());
         assertTrue(ex.getMessage().contains("m³"));
     }
 
     @Test
     void validateShouldRejectWhenBothWeightAndVolumeExceeded() {
-        ItemSize heavyAndBulky = new ItemSize(5.0, 0.1);
+        ItemSize heavyAndBulky = new ItemSize(new BigDecimal("5.000"), new BigDecimal("0.100"));
 
         ShelfCapacityExceededException ex = assertThrows(
                 ShelfCapacityExceededException.class,
@@ -75,20 +81,19 @@ class CapacityValidatorTest {
         assertFalse(checkResult.isAllowed());
     }
 
-    // F2.7: Határeset (pontosan a maximum még megengedett)
+    // F2.7: Határeset (pontosan a maximum még megengedett) + BigDecimal pontosság (0.1 + 0.2 == 0.3)
     @Test
     void validateShouldAcceptExactCapacityLimit() {
-        // Új súly: 320 + (1.8 * 100) = 500.0 kg == 500.0 kg
-        // Új térfogat: 2.0 + (0.03 * 100) = 5.0 m³ == 5.0 m³
-        ItemSize exactFitItem = new ItemSize(1.8, 0.03);
+        ShelfLoad precisionShelf = new ShelfLoad("S-01-01", 0.1, 0.1, 0.3, 0.3);
+        ItemSize precisionItem = new ItemSize(0.2, 0.2);
 
-        CapacityCheckResult result = validator.validate(defaultShelf, exactFitItem, 100);
+        CapacityCheckResult result = validator.validate(precisionShelf, precisionItem, 1);
 
         assertTrue(result.isAllowed());
         assertTrue(result.weightOk());
         assertTrue(result.volumeOk());
-        assertEquals(500.0, result.newWeight());
-        assertEquals(5.0, result.newVolume());
+        assertEquals(0, new BigDecimal("0.3").compareTo(result.newWeight()));
+        assertEquals(0, new BigDecimal("0.3").compareTo(result.newVolume()));
     }
 
     // F2.8: 0 vagy negatív mennyiség elutasítása
@@ -108,4 +113,3 @@ class CapacityValidatorTest {
         );
     }
 }
-

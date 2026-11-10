@@ -1,17 +1,18 @@
 package hu.unideb.inf.backend.service.capacity;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 
 public class CapacityCalculator {
 
-    public double calculateNewWeight(ShelfLoad shelf, ItemSize item, int quantity) {
+    public BigDecimal calculateNewWeight(ShelfLoad shelf, ItemSize item, int quantity) {
         validateInputs(shelf, item, quantity);
-        return shelf.currentWeight() + (item.unitWeight() * quantity);
+        return shelf.currentWeight().add(item.unitWeight().multiply(BigDecimal.valueOf(quantity)));
     }
 
-    public double calculateNewVolume(ShelfLoad shelf, ItemSize item, int quantity) {
+    public BigDecimal calculateNewVolume(ShelfLoad shelf, ItemSize item, int quantity) {
         validateInputs(shelf, item, quantity);
-        return shelf.currentVolume() + (item.unitVolume() * quantity);
+        return shelf.currentVolume().add(item.unitVolume().multiply(BigDecimal.valueOf(quantity)));
     }
 
     private void validateInputs(ShelfLoad shelf, ItemSize item, int quantity) {
