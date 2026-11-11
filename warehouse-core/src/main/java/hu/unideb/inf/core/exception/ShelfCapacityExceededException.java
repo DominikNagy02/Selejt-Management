@@ -1,6 +1,9 @@
 package hu.unideb.inf.core.exception;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class ShelfCapacityExceededException extends RuntimeException {
 
@@ -8,6 +11,7 @@ public class ShelfCapacityExceededException extends RuntimeException {
     private final BigDecimal maxLimit;
     private final BigDecimal calculatedValue;
     private final String unit;
+    private final List<CapacityViolation> violations;
 
     public ShelfCapacityExceededException(
             String shelfCode,
@@ -15,7 +19,13 @@ public class ShelfCapacityExceededException extends RuntimeException {
             BigDecimal calculatedValue,
             String unit
     ) {
-        this(shelfCode, maxLimit, calculatedValue, unit, buildMessage(shelfCode, maxLimit, calculatedValue, unit));
+        this(
+                shelfCode,
+                maxLimit,
+                calculatedValue,
+                unit,
+                buildMessage(shelfCode, maxLimit, calculatedValue, unit)
+        );
     }
 
     public ShelfCapacityExceededException(
@@ -25,11 +35,40 @@ public class ShelfCapacityExceededException extends RuntimeException {
             String unit,
             String message
     ) {
-        super(message);
-        this.shelfCode = shelfCode;
-        this.maxLimit = maxLimit;
-        this.calculatedValue = calculatedValue;
-        this.unit = unit;
+        this(
+                shelfCode,
+                List.of(new CapacityViolation(resolveDimension(unit), maxLimit, calculatedValue, unit)),
+                message
+        );
+    }
+
+    public ShelfCapacityExceededException(
+            String shelfCode,
+            List<CapacityViolation> violations,
+            String message
+    ) {
+        super(Objects.requireNonNull(message, "message must not be null"));
+        this.shelfCode = Objects.requireNonNull(shelfCode, "shelfCode must not be null");
+        Objects.requireNonNull(violations, "violations must not be null");
+        if (violations.isEmpty()) {
+            throw new IllegalArgumentException("violations must not be empty");
+        }
+        this.violations = List.copyOf(violations);
+        CapacityViolation primary = this.violations.get(0);
+        this.maxLimit = primary.maxLimit();
+        this.calculatedValue = primary.calculatedValue();
+        this.unit = this.violations.stream()
+                .map(CapacityViolation::unit)
+                .collect(Collectors.joining(", "));
+    }
+
+    public static String formatDecimal(BigDecimal value) {
+        Objects.requireNonNull(value, "value must not be null");
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static String resolveDimension(String unit) {
+        return "m³".equals(unit) ? "volume" : "weight";
     }
 
     private static String buildMessage(
@@ -40,7 +79,7 @@ public class ShelfCapacityExceededException extends RuntimeException {
     ) {
         return String.format(
                 "A polc (%s) kapacitása meghaladná a maximális %s %s értéket. Számított új érték: %s %s.",
-                shelfCode, maxLimit.toPlainString(), unit, calculatedValue.toPlainString(), unit
+                shelfCode, formatDecimal(maxLimit), unit, formatDecimal(calculatedValue), unit
         );
     }
 
@@ -58,5 +97,9 @@ public class ShelfCapacityExceededException extends RuntimeException {
 
     public String getUnit() {
         return unit;
+    }
+
+    public List<CapacityViolation> getViolations() {
+        return violations;
     }
 }

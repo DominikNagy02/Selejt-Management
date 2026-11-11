@@ -1,10 +1,14 @@
 package hu.unideb.inf.backend.service.capacity;
 
+import hu.unideb.inf.core.exception.CapacityViolation;
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Objects;
+
+import static hu.unideb.inf.core.exception.ShelfCapacityExceededException.formatDecimal;
 
 @Component
 public class CapacityValidator {
@@ -33,40 +37,58 @@ public class CapacityValidator {
         CapacityCheckResult result = check(shelf, item, quantity);
 
         if (!result.weightOk() && !result.volumeOk()) {
+            CapacityViolation weightViolation = new CapacityViolation(
+                    "weight", shelf.maxWeight(), result.newWeight(), "kg"
+            );
+            CapacityViolation volumeViolation = new CapacityViolation(
+                    "volume", shelf.maxVolume(), result.newVolume(), "m³"
+            );
             String message = String.format(
                     "A polc (%s) súly- és térfogatkorlátja is túllépésre kerülne: súly %s / %s kg, térfogat %s / %s m³.",
                     shelf.code(),
-                    result.newWeight().toPlainString(),
-                    shelf.maxWeight().toPlainString(),
-                    result.newVolume().toPlainString(),
-                    shelf.maxVolume().toPlainString()
+                    formatDecimal(result.newWeight()),
+                    formatDecimal(shelf.maxWeight()),
+                    formatDecimal(result.newVolume()),
+                    formatDecimal(shelf.maxVolume())
             );
             throw new ShelfCapacityExceededException(
-                    shelf.code(), shelf.maxWeight(), result.newWeight(), "kg, m³", message
+                    shelf.code(),
+                    List.of(weightViolation, volumeViolation),
+                    message
             );
         }
 
         if (!result.weightOk()) {
+            CapacityViolation weightViolation = new CapacityViolation(
+                    "weight", shelf.maxWeight(), result.newWeight(), "kg"
+            );
             String message = String.format(
                     "A polc (%s) teherbírása meghaladná a maximális %s kg-ot. Számított új súly: %s kg.",
                     shelf.code(),
-                    shelf.maxWeight().toPlainString(),
-                    result.newWeight().toPlainString()
+                    formatDecimal(shelf.maxWeight()),
+                    formatDecimal(result.newWeight())
             );
             throw new ShelfCapacityExceededException(
-                    shelf.code(), shelf.maxWeight(), result.newWeight(), "kg", message
+                    shelf.code(),
+                    List.of(weightViolation),
+                    message
             );
         }
 
         if (!result.volumeOk()) {
+            CapacityViolation volumeViolation = new CapacityViolation(
+                    "volume", shelf.maxVolume(), result.newVolume(), "m³"
+            );
             String message = String.format(
                     "A polc (%s) térfogata meghaladná a maximális %s m³-t. Számított új térfogat: %s m³.",
                     shelf.code(),
-                    shelf.maxVolume().toPlainString(),
-                    result.newVolume().toPlainString()
+                    formatDecimal(shelf.maxVolume()),
+                    formatDecimal(result.newVolume())
             );
             throw new ShelfCapacityExceededException(
-                    shelf.code(), shelf.maxVolume(), result.newVolume(), "m³", message
+                    shelf.code(),
+                    List.of(volumeViolation),
+                    message
             );
         }
 
