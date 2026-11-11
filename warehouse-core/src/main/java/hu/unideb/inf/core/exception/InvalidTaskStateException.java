@@ -4,7 +4,10 @@ import hu.unideb.inf.core.enums.TaskStatus;
 
 import java.util.Objects;
 
-public class InvalidTaskStateException extends RuntimeException {
+public class InvalidTaskStateException extends WmsBusinessException {
+
+    public static final String ERROR_CODE = "invalid-task-state";
+    public static final String TITLE = "Invalid Task State";
 
     private final Long taskId;
     private final TaskStatus currentStatus;
@@ -15,7 +18,7 @@ public class InvalidTaskStateException extends RuntimeException {
     }
 
     public InvalidTaskStateException(Long taskId, TaskStatus currentStatus, TaskStatus targetStatus) {
-        super(buildMessage(taskId, currentStatus, targetStatus));
+        super(ERROR_CODE, TITLE, 409, buildMessage(taskId, currentStatus, targetStatus));
         this.taskId = taskId;
         this.currentStatus = currentStatus;
         this.targetStatus = targetStatus;
@@ -48,4 +51,3 @@ public class InvalidTaskStateException extends RuntimeException {
         return targetStatus;
     }
 }
-

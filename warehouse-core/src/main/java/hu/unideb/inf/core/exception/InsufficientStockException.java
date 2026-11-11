@@ -1,6 +1,9 @@
 package hu.unideb.inf.core.exception;
 
-public class InsufficientStockException extends RuntimeException {
+public class InsufficientStockException extends WmsBusinessException {
+
+    public static final String ERROR_CODE = "insufficient-stock";
+    public static final String TITLE = "Insufficient Stock";
 
     private final String productSku;
     private final int requestedQuantity;
@@ -11,7 +14,7 @@ public class InsufficientStockException extends RuntimeException {
     }
 
     public InsufficientStockException(String productSku, int requestedQuantity, int availableQuantity) {
-        super(buildMessage(productSku, requestedQuantity, availableQuantity));
+        super(ERROR_CODE, TITLE, 409, buildMessage(productSku, requestedQuantity, availableQuantity));
         this.productSku = productSku;
         this.requestedQuantity = requestedQuantity;
         this.availableQuantity = availableQuantity;
@@ -42,4 +45,3 @@ public class InsufficientStockException extends RuntimeException {
         return availableQuantity;
     }
 }
-

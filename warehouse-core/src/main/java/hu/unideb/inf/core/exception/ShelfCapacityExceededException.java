@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class ShelfCapacityExceededException extends RuntimeException {
+public class ShelfCapacityExceededException extends WmsBusinessException {
+
+    public static final String ERROR_CODE = "shelf-capacity-exceeded";
+    public static final String TITLE = "Shelf Capacity Exceeded";
 
     private final String shelfCode;
     private final BigDecimal maxLimit;
@@ -47,7 +50,7 @@ public class ShelfCapacityExceededException extends RuntimeException {
             List<CapacityViolation> violations,
             String message
     ) {
-        super(Objects.requireNonNull(message, "message must not be null"));
+        super(ERROR_CODE, TITLE, 409, message);
         this.shelfCode = Objects.requireNonNull(shelfCode, "shelfCode must not be null");
         Objects.requireNonNull(violations, "violations must not be null");
         if (violations.isEmpty()) {
