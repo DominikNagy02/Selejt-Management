@@ -1,5 +1,7 @@
 package hu.unideb.inf.backend.service.picking;
 
+import hu.unideb.inf.core.exception.InsufficientStockException;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -38,6 +40,11 @@ public abstract class AbstractPickingStrategy implements PickingStrategy {
                     allocatedQty
             ));
             remaining -= allocatedQty;
+        }
+
+        if (remaining > 0) {
+            int availableQuantity = quantity - remaining;
+            throw new InsufficientStockException(quantity, availableQuantity);
         }
 
         return List.copyOf(allocations);

@@ -1,8 +1,10 @@
 package hu.unideb.inf.backend.config;
 
+import hu.unideb.inf.backend.service.picking.PickingStrategyType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class WmsPropertiesTest {
 
@@ -10,35 +12,37 @@ class WmsPropertiesTest {
     void shouldUseDefaultValuesWhenNullSectionsProvided() {
         WmsProperties defaults = new WmsProperties(null, null);
 
-        assertEquals("FEFO", defaults.picking().strategy());
+        assertEquals(PickingStrategyType.FEFO, defaults.picking().strategy());
         assertEquals(30, defaults.reservation().timeoutMinutes());
     }
 
     @Test
-    void shouldFallbackToDefaultsWhenNullBlankOrNonPositiveValuesProvided() {
+    void shouldDefaultStrategyToFefoWhenNullAndRejectNonPositiveTimeout() {
         WmsProperties nullStrategy = new WmsProperties(
                 new WmsProperties.Picking(null),
-                new WmsProperties.Reservation(-5)
+                new WmsProperties.Reservation(15)
         );
-        assertEquals("FEFO", nullStrategy.picking().strategy());
-        assertEquals(30, nullStrategy.reservation().timeoutMinutes());
+        assertEquals(PickingStrategyType.FEFO, nullStrategy.picking().strategy());
+        assertEquals(15, nullStrategy.reservation().timeoutMinutes());
 
-        WmsProperties blankStrategy = new WmsProperties(
-                new WmsProperties.Picking("   "),
-                new WmsProperties.Reservation(0)
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new WmsProperties.Reservation(0)
         );
-        assertEquals("FEFO", blankStrategy.picking().strategy());
-        assertEquals(30, blankStrategy.reservation().timeoutMinutes());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new WmsProperties.Reservation(-5)
+        );
     }
 
     @Test
     void shouldKeepExplicitValidValues() {
         WmsProperties properties = new WmsProperties(
-                new WmsProperties.Picking("FIFO"),
+                new WmsProperties.Picking(PickingStrategyType.FIFO),
                 new WmsProperties.Reservation(45)
         );
 
-        assertEquals("FIFO", properties.picking().strategy());
+        assertEquals(PickingStrategyType.FIFO, properties.picking().strategy());
         assertEquals(45, properties.reservation().timeoutMinutes());
     }
 }
