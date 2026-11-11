@@ -17,8 +17,4 @@ public record ItemSize(
             throw new IllegalArgumentException("unitVolume must be greater than 0");
         }
     }
-
-    public ItemSize(double unitWeight, double unitVolume) {
-        this(BigDecimal.valueOf(unitWeight), BigDecimal.valueOf(unitVolume));
-    }
 }

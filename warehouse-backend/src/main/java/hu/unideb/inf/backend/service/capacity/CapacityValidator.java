@@ -15,10 +15,6 @@ public class CapacityValidator {
 
     private final CapacityCalculator calculator;
 
-    public CapacityValidator() {
-        this(new CapacityCalculator());
-    }
-
     public CapacityValidator(CapacityCalculator calculator) {
         this.calculator = Objects.requireNonNull(calculator, "calculator must not be null");
     }

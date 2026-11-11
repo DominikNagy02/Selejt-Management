@@ -1,8 +1,11 @@
 package hu.unideb.inf.backend.service.capacity;
 
+import org.springframework.stereotype.Component;
+
 import java.math.BigDecimal;
 import java.util.Objects;
 
+@Component
 public class CapacityCalculator {
 
     public BigDecimal calculateNewWeight(ShelfLoad shelf, ItemSize item, int quantity) {

@@ -32,20 +32,4 @@ public record ShelfLoad(
             throw new IllegalArgumentException("maxVolume must be greater than 0");
         }
     }
-
-    public ShelfLoad(
-            String code,
-            double currentWeight,
-            double currentVolume,
-            double maxWeight,
-            double maxVolume
-    ) {
-        this(
-                code,
-                BigDecimal.valueOf(currentWeight),
-                BigDecimal.valueOf(currentVolume),
-                BigDecimal.valueOf(maxWeight),
-                BigDecimal.valueOf(maxVolume)
-        );
-    }
 }
