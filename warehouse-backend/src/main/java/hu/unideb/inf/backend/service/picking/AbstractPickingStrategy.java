@@ -1,5 +1,6 @@
 package hu.unideb.inf.backend.service.picking;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -12,25 +13,39 @@ public abstract class AbstractPickingStrategy implements PickingStrategy {
         if (quantity <= 0) {
             throw new IllegalArgumentException("quantity must be greater than 0");
         }
+        for (StockLot lot : lots) {
+            Objects.requireNonNull(lot, "lot must not be null");
+        }
 
         List<StockLot> sortedLots = lots.stream()
                 .filter(lot -> lot.availableQuantity() > 0)
+                .filter(this::isEligible)
                 .sorted(comparator())
                 .toList();
 
-        if (sortedLots.isEmpty()) {
-            return List.of();
+        List<Allocation> allocations = new ArrayList<>();
+        int remaining = quantity;
+
+        for (StockLot lot : sortedLots) {
+            if (remaining <= 0) {
+                break;
+            }
+            int allocatedQty = Math.min(remaining, lot.availableQuantity());
+            allocations.add(new Allocation(
+                    lot.inventoryItemId(),
+                    lot.shelfCode(),
+                    lot.batchNumber(),
+                    allocatedQty
+            ));
+            remaining -= allocatedQty;
         }
 
-        StockLot firstLot = sortedLots.get(0);
-        return List.of(new Allocation(
-                firstLot.inventoryItemId(),
-                firstLot.shelfCode(),
-                firstLot.batchNumber(),
-                quantity
-        ));
+        return List.copyOf(allocations);
+    }
+
+    protected boolean isEligible(StockLot lot) {
+        return true;
     }
 
     protected abstract Comparator<StockLot> comparator();
 }
-
