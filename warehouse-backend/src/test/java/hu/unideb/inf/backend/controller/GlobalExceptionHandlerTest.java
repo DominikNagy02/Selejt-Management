@@ -72,7 +72,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.title").value("Shelf Capacity Exceeded"))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.detail").value(
-                        "A polc (S-04-12) kapacitása meghaladná a maximális 500 kg értéket. Számított új érték: 540 kg."
+                        "A polc (S-04-12) teherbírása meghaladná a maximális 500 kg-ot. Számított új súly: 540 kg."
                 ))
                 .andExpect(jsonPath("$.instance").value("/api/v1/inventory/inbound"))
                 .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"))
@@ -161,8 +161,34 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void fallsBackToDefaultMessageWhenFieldErrorMessageIsNullAndSupportsDefaultConstructor() throws Exception {
-        GlobalExceptionHandler defaultHandler = new GlobalExceptionHandler();
+    void mapsMalformedJsonTo400ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/inventory/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{broken-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/malformed-request"))
+                .andExpect(jsonPath("$.title").value("Malformed Request"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("A kérés törzse nem olvasható vagy hibás JSON formátumú."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/inventory/validate"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
+
+    @Test
+    void mapsUnexpectedExceptionTo500ProblemDetailWithoutLeakingDetails() throws Exception {
+        mockMvc.perform(get("/api/v1/unexpected-error"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/internal-error"))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value("Váratlan szerverhiba történt."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/unexpected-error"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
+
+    @Test
+    void fallsBackToDefaultMessageWhenFieldErrorMessageIsNull() throws Exception {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(Clock.systemUTC());
         assertThrows(NullPointerException.class, () -> new GlobalExceptionHandler(null));
 
         TestPayload target = new TestPayload("", 0);
@@ -174,7 +200,7 @@ class GlobalExceptionHandlerTest {
         MethodArgumentNotValidException exception = new MethodArgumentNotValidException(parameter, bindingResult);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/inventory/validate");
-        ProblemDetail problemDetail = defaultHandler.handleValidationErrors(exception, request);
+        ProblemDetail problemDetail = handler.handleValidationErrors(exception, request);
 
         assertEquals(400, problemDetail.getStatus());
         assertNotNull(problemDetail.getProperties());
@@ -219,6 +245,11 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/api/v1/inventory/validate")
         public void validate(@Valid @RequestBody TestPayload payload) {
             // Validated by Spring MVC before method body executes
+        }
+
+        @GetMapping("/api/v1/unexpected-error")
+        public void unexpectedError() {
+            throw new IllegalStateException("Sensitive internal database stack trace detail");
         }
     }
 
