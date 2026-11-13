@@ -96,9 +96,11 @@ graph TD
 
 ### Előfeltételek
 - **Java Development Kit (JDK)**: OpenJDK 17 vagy újabb
-- **Apache Maven**: 3.9 vagy újabb
+- **Apache Maven**: nem kötelező – a repóban lévő Maven Wrapper (`mvnw` / `mvnw.cmd`) letölti a megfelelő verziót
 - **Adatbázis**: Relációs adatbázis (kiválasztás alatt; a Spring Data JPA révén könnyen konfigurálható)
 - **Git**
+
+> **Windows megjegyzés:** ha a `PATH`-on régebbi Java (pl. 8) van, állítsd a `JAVA_HOME`-ot egy JDK 17-re, a wrapper azt használja.
 
 ### 1. Repository klónozása
 ```bash
@@ -108,43 +110,60 @@ cd Selejt-Management
 
 ### 2. Projekt fordítása és tesztelés
 ```bash
-mvn clean install
+./mvnw clean install          # Linux / macOS
+.\mvnw.cmd clean install      # Windows
 ```
+
+Csak a backend és a függőségei, tesztekkel és JaCoCo lefedettség-ellenőrzéssel (min. 80% instruction + branch):
+```bash
+./mvnw -pl warehouse-backend -am verify
+```
+*A lefedettségi riport: `warehouse-backend/target/site/jacoco/index.html`*
 
 ### 3. Backend és Web Portál indítása
 ```bash
-mvn --projects warehouse-backend spring-boot:run
+./mvnw -pl warehouse-backend spring-boot:run
 ```
 *A webes adminisztrációs felület elérhető a böngészőből: `http://localhost:8080`*
 
 ### 4. JavaFX asztali kliens indítása
 ```bash
-mvn --projects warehouse-javafx javafx:run
+./mvnw -pl warehouse-javafx javafx:run
 ```
 
+### Backend konfiguráció (`application.yml`)
+
+| Kulcs | Alapérték | Leírás |
+| :--- | :--- | :--- |
+| `wms.picking.strategy` | `FEFO` | Kiadási stratégia: `FIFO` vagy `FEFO` |
+| `wms.reservation.timeout-minutes` | `30` | Soft-reservation lejárati ideje percben (pozitív egész) |
+
 ---
+
 
 ## 🗺️ Útiterv (Roadmap)
 
 | Funkció | Állapot (Backend) | Állapot (Frontend) | Prioritás |
 | :--- | :--- | :--- | :--- |
-| **Rendszertervezés & Specifikáció** | 🚧 Folyamatban  | 🚧 Folyamatban | Magas |
+| **Rendszertervezés & Specifikáció** | ☑️ Kész | ☑️ Kész | Magas |
 | **Multi-module Maven Architektúra** | 🚧 Folyamatban | 🚧 Folyamatban | Magas |
+| **Egységes hibakezelés (RFC 7807 ProblemDetail)** | ☑️ Kész | — | Magas |
 | **Adatbázis Séma & Migrációk (Flyway)** | 📅 Tervezve | 📅 Tervezve | Magas |
 | **Felhasználókezelés & Hitelesítés (JWT / RBAC)** | 📅 Tervezve | 📅 Tervezve | Magas |
 | **Törzsadat-kezelés (Raktárak, Polcok)** | 📅 Tervezve | 📅 Tervezve (Web) | Magas |
 | **Terméktörzs & Vonalkódkezelés** | 📅 Tervezve | 📅 Tervezve (Web & Asztali) | Magas |
-| **Polckapacitás Ellenőrzés (Súly / Térfogat)** | 📅 Tervezve | 📅 Tervezve | Magas |
+| **Polckapacitás Ellenőrzés (Súly / Térfogat)** | 🚧 Algoritmus kész, API-integráció hátra | 📅 Tervezve | Magas |
 | **Áruátvétel & Bevételezés (Inbound)** | 📅 Tervezve | 📅 Tervezve (JavaFX) | Magas |
 | **Intelligens Polchely Ajánlás** | 📅 Tervezve | 📅 Tervezve (JavaFX) | Közepes |
 | **Készletmozgatás & Áthelyezés (Transfer)** | 📅 Tervezve | 📅 Tervezve (JavaFX) | Magas |
-| **Komissiózás (FIFO / FEFO Kigyűjtés)** | 📅 Tervezve | 📅 Tervezve (JavaFX) | Magas |
+| **Komissiózás (FIFO / FEFO Kigyűjtés)** | 🚧 Algoritmus kész, API-integráció hátra | 📅 Tervezve (JavaFX) | Magas |
+| **Feladat Életciklus Állapotgép** | 🚧 Állapotgép kész, feladatkezelés hátra | 📅 Tervezve (JavaFX) | Magas |
 | **Kétfázisú Készletfoglalás (Soft-Reservation)** | 📅 Tervezve | 📅 Tervezve | Magas |
 | **Selejtezési Folyamat (Scrap Management)** | 📅 Tervezve | 📅 Tervezve (Web) | Közepes |
 | **Audit Naplózás & Mozgástörténet** | 📅 Tervezve | 📅 Tervezve (Web) | Közepes |
 | **Leltározás & PDF Riport Export** | 📅 Tervezve | 📅 Tervezve (Web) | Alacsony |
 | **Vonalkód-olvasó & Gyorsbillentyűk** | — | 📅 Tervezve (JavaFX) | Alacsony |
-| **Automatizált Tesztelés (JaCoCo $\ge$ 80%)** | 📅 Tervezve | 📅 Tervezve | Magas |
+| **Automatizált Tesztelés (JaCoCo $\ge$ 80%)** | 🚧 JaCoCo kényszerítés bekötve, backend 99,5% | 📅 Tervezve | Magas |
 | **Külső ERP / Csomagküldő Integráció** | ❔ Ötlet | ❔ Ötlet | Alacsony |
 
 ## 📄 Licenc

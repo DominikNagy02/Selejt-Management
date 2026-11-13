@@ -1,6 +1,9 @@
 package hu.unideb.inf.backend;
 
 import hu.unideb.inf.backend.config.WmsProperties;
+import hu.unideb.inf.backend.service.capacity.CapacityValidator;
+import hu.unideb.inf.backend.service.picking.PickingStrategy;
+import hu.unideb.inf.backend.service.picking.PickingStrategyType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,24 +17,19 @@ class WarehouseBackendApplicationTests {
     @Autowired
     private WmsProperties wmsProperties;
 
+    @Autowired
+    private CapacityValidator capacityValidator;
+
+    @Autowired
+    private PickingStrategy pickingStrategy;
+
     @Test
     void contextLoads() {
         assertNotNull(wmsProperties);
-        assertEquals("FEFO", wmsProperties.picking().strategy());
+        assertEquals(PickingStrategyType.FEFO, wmsProperties.picking().strategy());
         assertEquals(30, wmsProperties.reservation().timeoutMinutes());
-    }
-
-    @Test
-    void wmsPropertiesFallbackDefaults() {
-        WmsProperties defaults = new WmsProperties(null, null);
-        assertEquals("FEFO", defaults.picking().strategy());
-        assertEquals(30, defaults.reservation().timeoutMinutes());
-
-        WmsProperties blankAndNonPositive = new WmsProperties(
-                new WmsProperties.Picking("   "),
-                new WmsProperties.Reservation(0)
-        );
-        assertEquals("FEFO", blankAndNonPositive.picking().strategy());
-        assertEquals(30, blankAndNonPositive.reservation().timeoutMinutes());
+        assertNotNull(capacityValidator);
+        assertNotNull(pickingStrategy);
+        assertEquals(PickingStrategyType.FEFO, pickingStrategy.type());
     }
 }
