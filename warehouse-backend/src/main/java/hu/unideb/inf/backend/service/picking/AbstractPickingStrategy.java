@@ -36,6 +36,7 @@ public abstract class AbstractPickingStrategy implements PickingStrategy {
             allocations.add(new Allocation(
                     lot.inventoryItemId(),
                     lot.shelfCode(),
+                    lot.tierLevel(),
                     lot.batchNumber(),
                     allocatedQty
             ));
