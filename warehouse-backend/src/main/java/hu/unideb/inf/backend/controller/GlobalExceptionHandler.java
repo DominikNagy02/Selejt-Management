@@ -4,6 +4,7 @@ import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import hu.unideb.inf.core.exception.WmsBusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -25,6 +26,9 @@ public class GlobalExceptionHandler {
     public static final String VALIDATION_ERROR_CODE = "validation-failed";
     public static final String VALIDATION_ERROR_TITLE = "Validation Failed";
     public static final String VALIDATION_ERROR_DETAIL = "A kérés adatai érvénytelenek.";
+    public static final String OPTIMISTIC_LOCK_ERROR_CODE = "optimistic-lock-conflict";
+    public static final String OPTIMISTIC_LOCK_ERROR_TITLE = "Optimistic Lock Conflict";
+    public static final String OPTIMISTIC_LOCK_ERROR_DETAIL = "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra.";
 
     private final Clock clock;
 
@@ -35,6 +39,20 @@ public class GlobalExceptionHandler {
     @Autowired
     public GlobalExceptionHandler(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(
+            OptimisticLockingFailureException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.CONFLICT,
+                OPTIMISTIC_LOCK_ERROR_CODE,
+                OPTIMISTIC_LOCK_ERROR_TITLE,
+                OPTIMISTIC_LOCK_ERROR_DETAIL,
+                request
+        );
     }
 
     @ExceptionHandler(ShelfCapacityExceededException.class)
@@ -96,4 +114,3 @@ public class GlobalExceptionHandler {
         return pd;
     }
 }
-

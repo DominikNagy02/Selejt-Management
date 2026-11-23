@@ -20,6 +20,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
@@ -49,23 +50,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.TestErrorController.class, GlobalExceptionHandlerTest.FixedClockConfig.class})
 class GlobalExceptionHandlerTest {
 
-    private static final Instant FIXED_INSTANT = Instant.parse("2026-10-20T14:30:00Z");
-
     @Autowired
     private MockMvc mockMvc;
 
-    @TestConfiguration
-    static class FixedClockConfig {
-
-        @Bean
-        @Primary
-        Clock testClock() {
-            return Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
-        }
-    }
-
     @Test
-    void mapsShelfCapacityExceededTo409ProblemDetailWithViolations() throws Exception {
+    void mapsShelfCapacityExceededTo409ProblemDetailWithCustomProperties() throws Exception {
         mockMvc.perform(post("/api/v1/inventory/inbound"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/shelf-capacity-exceeded"))
@@ -78,6 +67,8 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"))
                 .andExpect(jsonPath("$.shelfCode").value("S-04-12"))
                 .andExpect(jsonPath("$.violations[0].dimension").value("weight"))
+                .andExpect(jsonPath("$.violations[0].maxLimit").value(500))
+                .andExpect(jsonPath("$.violations[0].calculatedValue").value(540))
                 .andExpect(jsonPath("$.violations[0].unit").value("kg"));
     }
 
@@ -138,6 +129,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsOptimisticLockingFailureTo409ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/test/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/optimistic-lock-conflict"))
+                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value(
+                        "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra."
+                ))
+                .andExpect(jsonPath("$.instance").value("/api/v1/test/optimistic-lock"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
+
+    @Test
     void mapsMethodArgumentNotValidTo400ProblemDetailWithFieldErrors() throws Exception {
         String invalidJson = """
                 {
@@ -163,10 +168,11 @@ class GlobalExceptionHandlerTest {
     @Test
     void fallsBackToDefaultMessageWhenFieldErrorMessageIsNullAndSupportsDefaultConstructor() throws Exception {
         GlobalExceptionHandler defaultHandler = new GlobalExceptionHandler();
-        assertThrows(NullPointerException.class, () -> new GlobalExceptionHandler(null));
 
-        TestPayload target = new TestPayload("", 0);
-        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(target, "testPayload");
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(
+                new TestPayload("B-1", 10),
+                "testPayload"
+        );
         bindingResult.addError(new FieldError("testPayload", "batchNumber", null));
 
         Method method = TestErrorController.class.getDeclaredMethod("validate", TestPayload.class);
@@ -216,6 +222,11 @@ class GlobalExceptionHandlerTest {
             throw new InvalidTaskStateException(id, TaskStatus.COMPLETED, TaskStatus.IN_PROGRESS);
         }
 
+        @PostMapping("/api/v1/test/optimistic-lock")
+        public void optimisticLock() {
+            throw new ObjectOptimisticLockingFailureException("InventoryItem", 1L);
+        }
+
         @PostMapping("/api/v1/inventory/validate")
         public void validate(@Valid @RequestBody TestPayload payload) {
             // Validated by Spring MVC before method body executes
@@ -226,5 +237,15 @@ class GlobalExceptionHandlerTest {
             @NotBlank String batchNumber,
             @Positive int quantity
     ) {
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        public Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2026-10-20T14:30:00Z"), ZoneOffset.UTC);
+        }
     }
 }
