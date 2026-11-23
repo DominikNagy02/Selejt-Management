@@ -1,0 +1,117 @@
+package hu.unideb.inf.core.exception;
+
+import hu.unideb.inf.core.enums.TaskStatus;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class CoreExceptionTest {
+
+    private static final class TestBusinessException extends WmsBusinessException {
+        TestBusinessException(int status) {
+            super("test-code", "Test Title", status, "Test error message");
+        }
+    }
+
+    @Test
+    void wmsBusinessExceptionValidatesHttpStatus() {
+        var valid = new TestBusinessException(400);
+        assertEquals("test-code", valid.getErrorCode());
+        assertEquals("Test Title", valid.getTitle());
+        assertEquals(400, valid.getHttpStatus());
+        assertEquals("Test error message", valid.getMessage());
+
+        assertThrows(IllegalArgumentException.class, () -> new TestBusinessException(99));
+        assertThrows(IllegalArgumentException.class, () -> new TestBusinessException(600));
+    }
+
+    @Test
+    void domainExceptionsStoreDetailsAndMessages() {
+        var notFound = ResourceNotFoundException.of("Shelf", 42L);
+        assertEquals("Shelf", notFound.getResourceType());
+        assertEquals("42", notFound.getIdentifier());
+        assertEquals(404, notFound.getHttpStatus());
+        assertEquals("resource-not-found", notFound.getErrorCode());
+        assertTrue(notFound.getMessage().contains("42"));
+
+        var insufficient = new InsufficientStockException("SKU-001", 10, 3);
+        assertEquals("SKU-001", insufficient.getProductSku());
+        assertEquals(10, insufficient.getRequestedQuantity());
+        assertEquals(3, insufficient.getAvailableQuantity());
+        assertEquals(409, insufficient.getHttpStatus());
+
+        var insufficientNoSku = new InsufficientStockException(10, 3);
+        assertNull(insufficientNoSku.getProductSku());
+        assertEquals(10, insufficientNoSku.getRequestedQuantity());
+
+        var insufficientBlankSku = new InsufficientStockException("   ", 10, 3);
+        assertEquals("   ", insufficientBlankSku.getProductSku());
+        assertTrue(insufficientBlankSku.getMessage().contains("Nincs elegendő elérhető készlet."));
+
+        var conflict = new ReservationConflictException(1L, 10, 3);
+        assertEquals(1L, conflict.getInventoryItemId());
+        assertEquals(10, conflict.getRequestedQuantity());
+        assertEquals(3, conflict.getAvailableQuantity());
+        assertEquals(409, conflict.getHttpStatus());
+
+        var invalidState = new InvalidTaskStateException(1L, TaskStatus.PENDING, TaskStatus.COMPLETED);
+        assertEquals(1L, invalidState.getTaskId());
+        assertEquals(TaskStatus.PENDING, invalidState.getCurrentStatus());
+        assertEquals(TaskStatus.COMPLETED, invalidState.getTargetStatus());
+        assertNotNull(invalidState.getMessage());
+
+        var invalidStateNoId = new InvalidTaskStateException(TaskStatus.PENDING, TaskStatus.COMPLETED);
+        assertNull(invalidStateNoId.getTaskId());
+
+        var weightViolation = new CapacityViolation(
+                "weight",
+                new BigDecimal("100.000"),
+                new BigDecimal("120.000"),
+                "kg"
+        );
+        var volumeViolation = new CapacityViolation(
+                "volume",
+                new BigDecimal("1.000000"),
+                new BigDecimal("1.500000"),
+                "m³"
+        );
+        var capacityExceeded = new ShelfCapacityExceededException(
+                "A-01-01",
+                List.of(weightViolation, volumeViolation),
+                "Kapacitás túllépve"
+        );
+        assertEquals("A-01-01", capacityExceeded.getShelfCode());
+        assertEquals(2, capacityExceeded.getViolations().size());
+        assertEquals(new BigDecimal("100.000"), capacityExceeded.getMaxLimit());
+        assertEquals(new BigDecimal("120.000"), capacityExceeded.getCalculatedValue());
+        assertEquals("kg, m³", capacityExceeded.getUnit());
+
+        var singleViolation = new ShelfCapacityExceededException(
+                "A-01-01",
+                new BigDecimal("500"),
+                new BigDecimal("550"),
+                "kg"
+        );
+        assertEquals("kg", singleViolation.getUnit());
+        assertEquals("weight", singleViolation.getViolations().get(0).dimension());
+
+        var singleVolumeViolation = new ShelfCapacityExceededException(
+                "A-01-01",
+                new BigDecimal("1.0"),
+                new BigDecimal("1.5"),
+                "m³",
+                "Térfogat túllépve"
+        );
+        assertEquals("m³", singleVolumeViolation.getUnit());
+        assertEquals("volume", singleVolumeViolation.getViolations().get(0).dimension());
+
+        assertThrows(IllegalArgumentException.class, () -> new ShelfCapacityExceededException("A-01-01", List.of(), "hiba"));
+    }
+}
