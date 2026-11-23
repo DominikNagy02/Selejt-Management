@@ -17,6 +17,7 @@ public record ProductRequest(
         @Size(max = ValidationConstants.SKU_MAX_LENGTH)
         String sku,
 
+        @NotBlank
         @Size(max = ValidationConstants.BARCODE_MAX_LENGTH)
         String barcode,
 

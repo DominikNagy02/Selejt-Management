@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 public record DeliveryOrderCreateRequest(
@@ -18,10 +18,7 @@ public record DeliveryOrderCreateRequest(
         @Size(max = ValidationConstants.CUSTOMER_NAME_MAX_LENGTH)
         String customerName,
 
-        @Size(max = ValidationConstants.ADDRESS_MAX_LENGTH)
-        String shippingAddress,
-
-        Instant dueDate,
+        LocalDate dueDate,
 
         @NotEmpty
         List<@Valid DeliveryOrderItemRequest> items

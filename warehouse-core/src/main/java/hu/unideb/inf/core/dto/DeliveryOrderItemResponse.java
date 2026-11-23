@@ -5,6 +5,7 @@ public record DeliveryOrderItemResponse(
         Long productId,
         String productSku,
         String productName,
+        Long requestedLotId,
         int requestedQuantity,
         int pickedQuantity
 ) {

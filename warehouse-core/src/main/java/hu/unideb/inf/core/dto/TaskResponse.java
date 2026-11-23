@@ -4,6 +4,7 @@ import hu.unideb.inf.core.enums.TaskStatus;
 import hu.unideb.inf.core.enums.TaskType;
 
 import java.time.Instant;
+import java.util.List;
 
 public record TaskResponse(
         Long id,
@@ -27,6 +28,7 @@ public record TaskResponse(
         Long createdById,
         String createdByUsername,
         String note,
+        List<TaskLineResponse> lines,
         Instant createdAt,
         Instant startedAt,
         Instant completedAt,
