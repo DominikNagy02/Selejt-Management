@@ -1,0 +1,10 @@
+# Alkalmazás konfiguráció (profilok: dev, prod, test)
+spring:
+  application:
+    name: warehouse-backend
+
+wms:
+  picking:
+    strategy: FEFO
+  reservation:
+    timeout-minutes: 30
