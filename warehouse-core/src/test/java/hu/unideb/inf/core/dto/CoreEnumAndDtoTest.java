@@ -156,12 +156,19 @@ class CoreEnumAndDtoTest {
                 true, ZoneType.CHILLED, 10, true
         );
         var prodReqDiff = new ProductRequest(
-                "SKU-002", null, "Másik", null,
+                "SKU-002", "5999876543210", "Másik", null,
                 new BigDecimal("2.000"), new BigDecimal("0.020000"),
                 false, ZoneType.NORMAL, 5, false
         );
         assertTrue(validator.validate(prodReq1).isEmpty());
         assertRecordBasics(prodReq1, prodReq2, prodReqDiff);
+
+        var invalidProdBarcode = new ProductRequest(
+                "SKU-003", "  ", "Név", null,
+                new BigDecimal("1.000"), new BigDecimal("0.010000"),
+                false, ZoneType.NORMAL, 0, true
+        );
+        assertFalse(validator.validate(invalidProdBarcode).isEmpty());
 
         var prodRes1 = new ProductResponse(
                 1L, "SKU-001", "5991234567890", "Termék", "Leírás",
@@ -187,25 +194,37 @@ class CoreEnumAndDtoTest {
         Instant now = Instant.now();
         LocalDate expiry = LocalDate.now().plusDays(30);
 
-        var inbReq1 = new InboundRequest(1L, 1L, 0, "LOT-01", expiry, 25);
-        var inbReq2 = new InboundRequest(1L, 1L, 0, "LOT-01", expiry, 25);
-        var inbReqDiff = new InboundRequest(2L, 2L, 1, "LOT-02", expiry, 10);
+        var inbReq1 = new InboundRequest(1L, 1L, 0, "BATCH-2026-A1", expiry, 25);
+        var inbReq2 = new InboundRequest(1L, 1L, 0, "BATCH-2026-A1", expiry, 25);
+        var inbReqDiff = new InboundRequest(2L, 2L, 1, "BATCH-2026-A2", expiry, 10);
         assertTrue(validator.validate(inbReq1).isEmpty());
         assertRecordBasics(inbReq1, inbReq2, inbReqDiff);
 
+        var invalidInbound = new InboundRequest(1L, 1L, null, "   ", expiry, 0);
+        assertEquals(2, validator.validate(invalidInbound).size());
+
         var inbRes1 = new InboundResponse(
-                1L, 1L, "SKU-001", "Termék", 1L, "A-01-01",
-                0, "LOT-01", expiry, 25, InventoryStatus.STORED, now
+                884L, 102L, "SKU-001", "Termék", 45L, "S-04-12",
+                0, "BATCH-2026-A1", expiry, 50,
+                new BigDecimal("320.500"), new BigDecimal("2.150000"),
+                InventoryStatus.STORED, now
         );
         var inbRes2 = new InboundResponse(
-                1L, 1L, "SKU-001", "Termék", 1L, "A-01-01",
-                0, "LOT-01", expiry, 25, InventoryStatus.STORED, now
+                884L, 102L, "SKU-001", "Termék", 45L, "S-04-12",
+                0, "BATCH-2026-A1", expiry, 50,
+                new BigDecimal("320.500"), new BigDecimal("2.150000"),
+                InventoryStatus.STORED, now
         );
         var inbResDiff = new InboundResponse(
-                2L, 2L, "SKU-002", "Másik", 2L, "B-01-01",
-                1, "LOT-02", expiry, 10, InventoryStatus.BLOCKED, now
+                885L, 103L, "SKU-002", "Másik", 46L, "S-04-13",
+                1, "BATCH-2026-A2", expiry, 10,
+                new BigDecimal("100.000"), new BigDecimal("0.500000"),
+                InventoryStatus.BLOCKED, now
         );
-        assertEquals(25, inbRes1.quantity());
+        assertEquals(50, inbRes1.quantity());
+        assertEquals(884L, inbRes1.inventoryItemId());
+        assertEquals(new BigDecimal("320.500"), inbRes1.currentShelfWeightKg());
+        assertEquals(new BigDecimal("2.150000"), inbRes1.currentShelfVolumeM3());
         assertRecordBasics(inbRes1, inbRes2, inbResDiff);
 
         var sug1 = new ShelfSuggestionResponse(1L, "A-01-01", ZoneType.NORMAL, new BigDecimal("500.000"), new BigDecimal("1.500000"));
@@ -233,64 +252,81 @@ class CoreEnumAndDtoTest {
     @Test
     void orderTaskAuditSummaryAndAuthUserDtosValidateAndBehaveCorrectly() {
         Instant now = Instant.now();
+        LocalDate dueDate = LocalDate.now().plusDays(7);
 
-        var itemReq1 = new DeliveryOrderItemRequest(1L, 5);
-        var itemReq2 = new DeliveryOrderItemRequest(1L, 5);
-        var itemReqDiff = new DeliveryOrderItemRequest(2L, 10);
+        var itemReq1 = new DeliveryOrderItemRequest(1L, 100L, 5);
+        var itemReq2 = new DeliveryOrderItemRequest(1L, 100L, 5);
+        var itemReqDiff = new DeliveryOrderItemRequest(2L, null, 10);
+        assertTrue(validator.validate(itemReq1).isEmpty());
         assertRecordBasics(itemReq1, itemReq2, itemReqDiff);
 
-        var itemRes1 = new DeliveryOrderItemResponse(1L, 1L, "SKU-001", "Termék", 5, 0);
-        var itemRes2 = new DeliveryOrderItemResponse(1L, 1L, "SKU-001", "Termék", 5, 0);
-        var itemResDiff = new DeliveryOrderItemResponse(2L, 2L, "SKU-002", "Másik", 10, 5);
+        var itemRes1 = new DeliveryOrderItemResponse(1L, 1L, "SKU-001", "Termék", 100L, 5, 0);
+        var itemRes2 = new DeliveryOrderItemResponse(1L, 1L, "SKU-001", "Termék", 100L, 5, 0);
+        var itemResDiff = new DeliveryOrderItemResponse(2L, 2L, "SKU-002", "Másik", null, 10, 5);
         assertRecordBasics(itemRes1, itemRes2, itemResDiff);
 
-        var orderReq1 = new DeliveryOrderCreateRequest("DO-001", "Vevő Kft.", "Budapest", now, List.of(itemReq1));
-        var orderReq2 = new DeliveryOrderCreateRequest("DO-001", "Vevő Kft.", "Budapest", now, List.of(itemReq1));
-        var orderReqDiff = new DeliveryOrderCreateRequest("DO-002", "Másik Kft.", "Debrecen", now, List.of(itemReqDiff));
+        var orderReq1 = new DeliveryOrderCreateRequest("DO-001", "Vevő Kft.", dueDate, List.of(itemReq1));
+        var orderReq2 = new DeliveryOrderCreateRequest("DO-001", "Vevő Kft.", dueDate, List.of(itemReq1));
+        var orderReqDiff = new DeliveryOrderCreateRequest("DO-002", "Másik Kft.", dueDate.plusDays(1), List.of(itemReqDiff));
         assertTrue(validator.validate(orderReq1).isEmpty());
         assertRecordBasics(orderReq1, orderReq2, orderReqDiff);
 
         var orderRes1 = new DeliveryOrderResponse(
-                1L, "DO-001", "Vevő Kft.", "Budapest", DeliveryOrderStatus.OPEN,
-                now, 1L, "dispatcher", List.of(itemRes1), now, now
+                1L, "DO-001", "Vevő Kft.", DeliveryOrderStatus.OPEN,
+                dueDate, 1L, "dispatcher", List.of(itemRes1), now, now
         );
         var orderRes2 = new DeliveryOrderResponse(
-                1L, "DO-001", "Vevő Kft.", "Budapest", DeliveryOrderStatus.OPEN,
-                now, 1L, "dispatcher", List.of(itemRes1), now, now
+                1L, "DO-001", "Vevő Kft.", DeliveryOrderStatus.OPEN,
+                dueDate, 1L, "dispatcher", List.of(itemRes1), now, now
         );
         var orderResDiff = new DeliveryOrderResponse(
-                2L, "DO-002", "Másik", "Debrecen", DeliveryOrderStatus.SHIPPED,
-                now, 2L, "admin", List.of(itemResDiff), now, now
+                2L, "DO-002", "Másik", DeliveryOrderStatus.SHIPPED,
+                dueDate.plusDays(2), 2L, "admin", List.of(itemResDiff), now, now
         );
         assertEquals("DO-001", orderRes1.doNumber());
+        assertEquals(dueDate, orderRes1.dueDate());
         assertRecordBasics(orderRes1, orderRes2, orderResDiff);
 
-        var taskReq1 = new TaskCreateRequest(TaskType.PICKING, 3, 1L, 1L, 1L, 0, null, null, 5, 1L, 2L, "Megjegyzés");
-        var taskReq2 = new TaskCreateRequest(TaskType.PICKING, 3, 1L, 1L, 1L, 0, null, null, 5, 1L, 2L, "Megjegyzés");
-        var taskReqDiff = new TaskCreateRequest(TaskType.PUTAWAY, 1, 2L, null, null, null, 2L, 1, 10, null, null, null);
+        var taskLineReq1 = new TaskLineRequest(1L, 10L, 1L, 0, 2L, 1, 5);
+        var taskLineReq2 = new TaskLineRequest(1L, 10L, 1L, 0, 2L, 1, 5);
+        var taskLineReqDiff = new TaskLineRequest(2L, 20L, 3L, 1, 4L, 2, 10);
+        assertTrue(validator.validate(taskLineReq1).isEmpty());
+        assertRecordBasics(taskLineReq1, taskLineReq2, taskLineReqDiff);
+
+        var taskLineRes1 = new TaskLineResponse(1L, 1L, 10L, "LOT-01", 1L, "A-01-01", 0, 2L, "B-01-01", 1, 5, 0);
+        var taskLineRes2 = new TaskLineResponse(1L, 1L, 10L, "LOT-01", 1L, "A-01-01", 0, 2L, "B-01-01", 1, 5, 0);
+        var taskLineResDiff = new TaskLineResponse(2L, 2L, 20L, "LOT-02", 3L, "A-01-02", 1, 4L, "B-01-02", 2, 10, 5);
+        assertRecordBasics(taskLineRes1, taskLineRes2, taskLineResDiff);
+
+        var taskReq1 = new TaskCreateRequest(TaskType.PICKING, 3, 1L, 1L, 1L, 0, null, null, 5, 1L, 2L, "Megjegyzés", List.of(taskLineReq1));
+        var taskReq2 = new TaskCreateRequest(TaskType.PICKING, 3, 1L, 1L, 1L, 0, null, null, 5, 1L, 2L, "Megjegyzés", List.of(taskLineReq1));
+        var taskReqDiff = new TaskCreateRequest(TaskType.PUTAWAY, 1, 2L, null, null, null, 2L, 1, 10, null, null, null, null);
         assertTrue(validator.validate(taskReq1).isEmpty());
         assertRecordBasics(taskReq1, taskReq2, taskReqDiff);
 
-        var compReq1 = new TaskCompleteRequest(5, "Teljesítve");
-        var compReq2 = new TaskCompleteRequest(5, "Teljesítve");
-        var compReqDiff = new TaskCompleteRequest(3, "Részleges");
+        var compReq1 = new TaskCompleteRequest("A-01-01", 5, "Teljesítve");
+        var compReq2 = new TaskCompleteRequest("A-01-01", 5, "Teljesítve");
+        var compReqDiff = new TaskCompleteRequest("B-01-01", 3, "Részleges");
         assertTrue(validator.validate(compReq1).isEmpty());
         assertRecordBasics(compReq1, compReq2, compReqDiff);
+
+        var invalidCompReq = new TaskCompleteRequest("  ", 0, null);
+        assertEquals(2, validator.validate(invalidCompReq).size());
 
         var taskRes1 = new TaskResponse(
                 1L, TaskType.PICKING, TaskStatus.PENDING, 3, 1L, "SKU-001", 1L,
                 1L, "A-01-01", 0, null, null, null, 5, 1L, "DO-001",
-                2L, "worker1", 1L, "dispatcher", "Megjegyzés", now, null, null, now
+                2L, "worker1", 1L, "dispatcher", "Megjegyzés", List.of(taskLineRes1), now, null, null, now
         );
         var taskRes2 = new TaskResponse(
                 1L, TaskType.PICKING, TaskStatus.PENDING, 3, 1L, "SKU-001", 1L,
                 1L, "A-01-01", 0, null, null, null, 5, 1L, "DO-001",
-                2L, "worker1", 1L, "dispatcher", "Megjegyzés", now, null, null, now
+                2L, "worker1", 1L, "dispatcher", "Megjegyzés", List.of(taskLineRes1), now, null, null, now
         );
         var taskResDiff = new TaskResponse(
                 2L, TaskType.SCRAP, TaskStatus.COMPLETED, 5, 2L, "SKU-002", 2L,
                 2L, "B-01-01", 1, null, null, null, 2, null, null,
-                2L, "worker1", 1L, "admin", "Selejt", now, now, now, now
+                2L, "worker1", 1L, "admin", "Selejt", null, now, now, now, now
         );
         assertEquals(TaskStatus.PENDING, taskRes1.status());
         assertRecordBasics(taskRes1, taskRes2, taskResDiff);
