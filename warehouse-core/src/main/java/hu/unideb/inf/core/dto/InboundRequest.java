@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-public record InventoryRequest(
+public record InboundRequest(
         @NotNull
         Long productId,
 

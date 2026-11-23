@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
-public record DeliveryOrderRequest(
+public record DeliveryOrderCreateRequest(
         @NotBlank
         @Size(max = ValidationConstants.DO_NUMBER_MAX_LENGTH)
         String doNumber,

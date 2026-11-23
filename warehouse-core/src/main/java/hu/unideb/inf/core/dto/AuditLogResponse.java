@@ -4,11 +4,12 @@ import hu.unideb.inf.core.enums.MovementType;
 
 import java.time.Instant;
 
-public record StockMovementResponse(
+public record AuditLogResponse(
         Long id,
         MovementType movementType,
         Long productId,
         String productSku,
+        String productName,
         Long inventoryId,
         Long fromShelfId,
         String fromShelfCode,

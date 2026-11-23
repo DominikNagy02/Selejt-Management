@@ -5,6 +5,7 @@ import hu.unideb.inf.shared.schemas.ValidationConstants;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -43,6 +44,9 @@ public record ProductRequest(
         boolean requiresExpiry,
 
         ZoneType requiredZoneType,
+
+        @Min(0)
+        int minStockLevel,
 
         Boolean active
 ) {

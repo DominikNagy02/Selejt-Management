@@ -5,7 +5,7 @@ import hu.unideb.inf.core.enums.InventoryStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 
-public record InventoryResponse(
+public record InboundResponse(
         Long id,
         Long productId,
         String productSku,
@@ -16,10 +16,7 @@ public record InventoryResponse(
         String lotNumber,
         LocalDate expiryDate,
         int quantity,
-        int reservedQuantity,
-        int availableQuantity,
         InventoryStatus status,
-        Instant receivedAt,
-        Instant updatedAt
+        Instant receivedAt
 ) {
 }

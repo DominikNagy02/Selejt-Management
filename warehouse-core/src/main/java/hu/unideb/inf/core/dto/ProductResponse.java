@@ -15,6 +15,7 @@ public record ProductResponse(
         BigDecimal unitVolumeM3,
         boolean requiresExpiry,
         ZoneType requiredZoneType,
+        int minStockLevel,
         boolean active,
         Instant createdAt,
         Instant updatedAt
