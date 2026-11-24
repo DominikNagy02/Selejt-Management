@@ -56,19 +56,15 @@ public class WarehouseEntity {
     }
 
     @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
+    public void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 
     public void addZone(ZoneEntity zone) {
@@ -148,7 +144,8 @@ public class WarehouseEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof WarehouseEntity that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        WarehouseEntity that = (WarehouseEntity) o;
         return Objects.equals(code, that.code);
     }
 

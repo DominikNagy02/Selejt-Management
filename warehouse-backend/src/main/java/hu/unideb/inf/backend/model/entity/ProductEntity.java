@@ -86,22 +86,18 @@ public class ProductEntity {
     }
 
     @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-        if (requiredZoneType == null) {
-            requiredZoneType = ZoneType.NORMAL;
+        this.createdAt = now;
+        this.updatedAt = now;
+        if (this.requiredZoneType == null) {
+            this.requiredZoneType = ZoneType.NORMAL;
         }
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
+    public void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 
     public Long getId() {
@@ -211,7 +207,8 @@ public class ProductEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ProductEntity that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        ProductEntity that = (ProductEntity) o;
         return Objects.equals(sku, that.sku);
     }
 

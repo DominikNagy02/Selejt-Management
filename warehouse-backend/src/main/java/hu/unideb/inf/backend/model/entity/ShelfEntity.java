@@ -89,28 +89,21 @@ public class ShelfEntity {
     }
 
     @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
+        this.createdAt = now;
+        this.updatedAt = now;
+        if (this.currentWeightKg == null) {
+            this.currentWeightKg = BigDecimal.ZERO;
         }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-        if (currentWeightKg == null) {
-            currentWeightKg = BigDecimal.ZERO;
-        }
-        if (currentVolumeM3 == null) {
-            currentVolumeM3 = BigDecimal.ZERO;
-        }
-        if (storageType == null) {
-            storageType = StorageType.RACK;
+        if (this.currentVolumeM3 == null) {
+            this.currentVolumeM3 = BigDecimal.ZERO;
         }
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
+    public void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 
     public Long getId() {
@@ -220,7 +213,8 @@ public class ShelfEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ShelfEntity that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        ShelfEntity that = (ShelfEntity) o;
         return Objects.equals(code, that.code);
     }
 

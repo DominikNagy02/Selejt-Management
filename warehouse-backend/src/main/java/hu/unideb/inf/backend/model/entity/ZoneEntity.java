@@ -71,19 +71,15 @@ public class ZoneEntity {
     }
 
     @PrePersist
-    protected void onCreate() {
+    public void onCreate() {
         Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
+    public void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 
     public void addShelf(ShelfEntity shelf) {
@@ -171,15 +167,15 @@ public class ZoneEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ZoneEntity that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        ZoneEntity that = (ZoneEntity) o;
         return Objects.equals(code, that.code) &&
-                Objects.equals(warehouse != null ? warehouse.getId() : null,
-                        that.warehouse != null ? that.warehouse.getId() : null);
+                Objects.equals(warehouse, that.warehouse);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(code, warehouse != null ? warehouse.getId() : null);
+        return Objects.hash(code, warehouse);
     }
 
     @Override
