@@ -7,6 +7,8 @@ public record DeliveryOrderItemRequest(
         @NotNull
         Long productId,
 
+        Long requestedLotId,
+
         @Positive
         int requestedQuantity
 ) {
