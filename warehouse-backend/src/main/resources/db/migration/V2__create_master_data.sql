@@ -20,7 +20,7 @@ CREATE TABLE zones (
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
-    CONSTRAINT fk_zones_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id) ON DELETE CASCADE,
+    CONSTRAINT fk_zones_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id) ON DELETE RESTRICT,
     CONSTRAINT uq_zones_warehouse_code UNIQUE (warehouse_id, code),
     CONSTRAINT chk_zones_type CHECK (zone_type IN ('NORMAL', 'CHILLED', 'HAZARDOUS'))
 );
@@ -39,7 +39,7 @@ CREATE TABLE shelves (
     version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
-    CONSTRAINT fk_shelves_zone FOREIGN KEY (zone_id) REFERENCES zones (id) ON DELETE CASCADE,
+    CONSTRAINT fk_shelves_zone FOREIGN KEY (zone_id) REFERENCES zones (id) ON DELETE RESTRICT,
     CONSTRAINT chk_shelves_storage_type CHECK (storage_type IN ('RACK', 'GROUND')),
     CONSTRAINT chk_shelves_max_tiers CHECK (max_tiers >= 1),
     CONSTRAINT chk_shelves_max_weight CHECK (max_weight_kg > 0),

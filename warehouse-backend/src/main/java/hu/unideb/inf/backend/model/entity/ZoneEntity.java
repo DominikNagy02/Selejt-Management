@@ -24,9 +24,12 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "zones", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_zones_warehouse_code", columnNames = {"warehouse_id", "code"})
-})
+@Table(
+        name = "zones",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_zones_warehouse_code", columnNames = {"warehouse_id", "code"})
+        }
+)
 public class ZoneEntity {
 
     @Id
@@ -56,7 +59,7 @@ public class ZoneEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "zone", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private List<ShelfEntity> shelves = new ArrayList<>();
 
     public ZoneEntity() {
