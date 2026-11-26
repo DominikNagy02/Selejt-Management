@@ -41,6 +41,14 @@ class CoreExceptionTest {
         assertEquals("resource-not-found", notFound.getErrorCode());
         assertTrue(notFound.getMessage().contains("42"));
 
+        var duplicate = DuplicateResourceException.of("Warehouse", "code", "WH-01");
+        assertEquals("Warehouse", duplicate.getResourceType());
+        assertEquals("code", duplicate.getField());
+        assertEquals("WH-01", duplicate.getValue());
+        assertEquals(409, duplicate.getHttpStatus());
+        assertEquals("duplicate-resource", duplicate.getErrorCode());
+        assertTrue(duplicate.getMessage().contains("WH-01"));
+
         var insufficient = new InsufficientStockException("SKU-001", 10, 3);
         assertEquals("SKU-001", insufficient.getProductSku());
         assertEquals(10, insufficient.getRequestedQuantity());
@@ -113,5 +121,11 @@ class CoreExceptionTest {
         assertEquals("volume", singleVolumeViolation.getViolations().get(0).dimension());
 
         assertThrows(IllegalArgumentException.class, () -> new ShelfCapacityExceededException("A-01-01", List.of(), "hiba"));
+
+        var autoDual = new ShelfCapacityExceededException("A-01-01", List.of(weightViolation, volumeViolation));
+        assertTrue(autoDual.getMessage().contains("súly- és térfogatkorlátja"));
+
+        var autoVolume = new ShelfCapacityExceededException("A-01-01", List.of(volumeViolation));
+        assertTrue(autoVolume.getMessage().contains("térfogata meghaladná"));
     }
 }
