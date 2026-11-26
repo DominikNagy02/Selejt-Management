@@ -90,6 +90,7 @@ public class InventoryItemEntity {
         return new StockLot(
                 id,
                 shelf != null ? shelf.getCode() : null,
+                tierLevel,
                 lot != null ? lot.getLotNumber() : null,
                 getAvailableQuantity(),
                 receivedAt != null ? receivedAt : Instant.now(),

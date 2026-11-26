@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
@@ -190,6 +191,30 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsInvalidMissingAndMismatchedParametersTo400ProblemDetail() throws Exception {
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.title").value("Invalid Request Parameter"))
+                .andExpect(jsonPath("$.detail").value("quantity must be greater than 0"));
+
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("A kérés adatai érvénytelenek."));
+
+        mockMvc.perform(get("/api/v1/test/param-error"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("Hiányzó kötelező paraméter: quantity"));
+
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("Érvénytelen paraméterérték: quantity"));
+    }
+
+    @Test
     void mapsUnexpectedExceptionTo500ProblemDetailWithoutLeakingDetails() throws Exception {
         mockMvc.perform(get("/api/v1/unexpected-error"))
                 .andExpect(status().isInternalServerError())
@@ -265,6 +290,16 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/api/v1/inventory/validate")
         public void validate(@Valid @RequestBody TestPayload payload) {
             // Validated by Spring MVC before method body executes
+        }
+
+        @GetMapping("/api/v1/test/param-error")
+        public void paramError(@RequestParam("quantity") int quantity) {
+            if (quantity == 0) {
+                throw new IllegalArgumentException("quantity must be greater than 0");
+            }
+            if (quantity < 0) {
+                throw new IllegalArgumentException("   ");
+            }
         }
 
         @GetMapping("/api/v1/unexpected-error")

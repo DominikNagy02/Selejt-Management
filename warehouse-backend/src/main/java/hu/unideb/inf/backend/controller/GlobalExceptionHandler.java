@@ -9,8 +9,10 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.time.Clock;
@@ -34,6 +36,8 @@ public class GlobalExceptionHandler {
     public static final String MALFORMED_REQUEST_TITLE = "Malformed Request";
     public static final String MALFORMED_REQUEST_DETAIL =
             "A kérés törzse nem olvasható vagy hibás JSON formátumú.";
+    public static final String INVALID_PARAMETER_CODE = "invalid-parameter";
+    public static final String INVALID_PARAMETER_TITLE = "Invalid Request Parameter";
     public static final String INTERNAL_ERROR_CODE = "internal-error";
     public static final String INTERNAL_ERROR_TITLE = "Internal Server Error";
     public static final String INTERNAL_ERROR_DETAIL = "Váratlan szerverhiba történt.";
@@ -112,6 +116,51 @@ public class GlobalExceptionHandler {
                 MALFORMED_REQUEST_CODE,
                 MALFORMED_REQUEST_TITLE,
                 MALFORMED_REQUEST_DETAIL,
+                request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingRequestParameter(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                "Hiányzó kötelező paraméter: " + ex.getParameterName(),
+                request
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                "Érvénytelen paraméterérték: " + ex.getName(),
+                request
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(
+            IllegalArgumentException ex,
+            HttpServletRequest request
+    ) {
+        String detail = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : VALIDATION_ERROR_DETAIL;
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                detail,
                 request
         );
     }
