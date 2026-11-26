@@ -1,10 +1,16 @@
-module hu.unideb.inf.kliens {
+module hu.unideb.inf.javafx {
     requires javafx.controls;
     requires javafx.fxml;
+    requires java.net.http;
+    requires com.fasterxml.jackson.databind;
+    requires com.fasterxml.jackson.datatype.jsr310;
+    requires hu.unideb.inf.core;
 
+    opens hu.unideb.inf.javafx to javafx.fxml;
+    opens hu.unideb.inf.javafx.controller to javafx.fxml;
+    opens hu.unideb.inf.javafx.model to com.fasterxml.jackson.databind;
 
-    opens hu.unideb.inf.kliens to javafx.fxml;
-    exports hu.unideb.inf.kliens;
-    exports hu.unideb.inf.kliens.controller;
-    opens hu.unideb.inf.kliens.controller to javafx.fxml;
+    exports hu.unideb.inf.javafx;
+    exports hu.unideb.inf.javafx.controller;
+    exports hu.unideb.inf.javafx.model;
 }
