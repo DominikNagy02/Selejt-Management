@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="hu" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::main-body}, ~{::title})}">
+<head>
+    <title th:text="${isEdit} ? 'Smart WMS - Termék Szerkesztése' : 'Smart WMS - Új Termék Rögzítése'">Smart WMS - Termék Űrlap</title>
+</head>
+<body>
+<div th:fragment="main-body">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-0" th:text="${isEdit} ? 'Termék Szerkesztése' : 'Új Termék Rögzítése'">Új Termék Rögzítése</h3>
+            <p class="text-muted small mb-0">Adja meg a termék alapadatit, méreteit és raktári zónakövetelményét.</p>
+        </div>
+        <div>
+            <a th:href="@{/admin/products}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Vissza a katalógushoz
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="card border-0 shadow-sm rounded-3 p-4">
+
+                <div th:if="${#fields.hasErrors('${productRequest.*}')}" class="alert alert-danger mb-4" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+                        <div>
+                            <strong>Kérjük, javítsa az űrlapon jelzett hibákat!</strong>
+                            <div class="small">Egy vagy több megadott mező érvénytelen adatot tartalmaz.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form th:action="${isEdit} ? @{/admin/products/{id}(id=${productId})} : @{/admin/products}"
+                      th:object="${productRequest}"
+                      method="post"
+                      novalidate>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <h5 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                                <i class="bi bi-info-circle me-1"></i> Alapadatok
+                            </h5>
+                        </div>
+
+                        <!-- Cikkszám (SKU) -->
+                        <div class="col-12 col-md-6">
+                            <label for="sku" class="form-label fw-semibold">
+                                Cikkszám (SKU) <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   id="sku"
+                                   th:field="*{sku}"
+                                   class="form-control"
+                                   th:errorclass="is-invalid"
+                                   placeholder="pl. SKU-1092">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('sku')}" th:errors="*{sku}">
+                                Hibás cikkszám
+                            </div>
+                        </div>
+
+                        <!-- Vonalkód -->
+                        <div class="col-12 col-md-6">
+                            <label for="barcode" class="form-label fw-semibold">
+                                Vonalkód (EAN / UPC) <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   id="barcode"
+                                   th:field="*{barcode}"
+                                   class="form-control font-monospace"
+                                   th:errorclass="is-invalid"
+                                   placeholder="pl. 5901234567890">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('barcode')}" th:errors="*{barcode}">
+                                Hibás vonalkód
+                            </div>
+                        </div>
+
+                        <!-- Megnevezés -->
+                        <div class="col-12">
+                            <label for="name" class="form-label fw-semibold">
+                                Termék megnevezése <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   id="name"
+                                   th:field="*{name}"
+                                   class="form-control"
+                                   th:errorclass="is-invalid"
+                                   placeholder="pl. Fékfolyadék DOT4 500ml">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">
+                                Hibás megnevezés
+                            </div>
+                        </div>
+
+                        <!-- Leírás -->
+                        <div class="col-12">
+                            <label for="description" class="form-label fw-semibold">
+                                Részletes leírás
+                            </label>
+                            <textarea id="description"
+                                      th:field="*{description}"
+                                      class="form-control"
+                                      th:errorclass="is-invalid"
+                                      rows="3"
+                                      placeholder="Kiegészítő információk, specifikáció..."></textarea>
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('description')}" th:errors="*{description}">
+                                Hibás leírás
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <h5 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                                <i class="bi bi-box-seam me-1"></i> Fizikai Tulajdonságok és Tárolás
+                            </h5>
+                        </div>
+
+                        <!-- Egységsúly -->
+                        <div class="col-12 col-md-6">
+                            <label for="unitWeightKg" class="form-label fw-semibold">
+                                Egységsúly (kg) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number"
+                                       step="0.001"
+                                       min="0.001"
+                                       id="unitWeightKg"
+                                       th:field="*{unitWeightKg}"
+                                       class="form-control"
+                                       th:errorclass="is-invalid"
+                                       placeholder="0.500">
+                                <span class="input-group-text">kg</span>
+                                <div class="invalid-feedback" th:if="${#fields.hasErrors('unitWeightKg')}" th:errors="*{unitWeightKg}">
+                                    A súlynak pozitív számnak kell lennie (min. 0.001 kg).
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Egységtérfogat -->
+                        <div class="col-12 col-md-6">
+                            <label for="unitVolumeM3" class="form-label fw-semibold">
+                                Egységtérfogat (m³) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number"
+                                       step="0.000001"
+                                       min="0.000001"
+                                       id="unitVolumeM3"
+                                       th:field="*{unitVolumeM3}"
+                                       class="form-control"
+                                       th:errorclass="is-invalid"
+                                       placeholder="0.001000">
+                                <span class="input-group-text">m³</span>
+                                <div class="invalid-feedback" th:if="${#fields.hasErrors('unitVolumeM3')}" th:errors="*{unitVolumeM3}">
+                                    A térfogatnak pozitív számnak kell lennie (min. 0.000001 m³).
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Zónakövetelmény -->
+                        <div class="col-12 col-md-6">
+                            <label for="requiredZoneType" class="form-label fw-semibold">
+                                Szükséges Zónatípus
+                            </label>
+                            <select id="requiredZoneType"
+                                    th:field="*{requiredZoneType}"
+                                    class="form-select"
+                                    th:errorclass="is-invalid">
+                                <option th:each="zt : ${zoneTypes}"
+                                        th:value="${zt}"
+                                        th:text="${zt}">NORMAL</option>
+                            </select>
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('requiredZoneType')}" th:errors="*{requiredZoneType}">
+                                Hibás zónatípus
+                            </div>
+                        </div>
+
+                        <!-- Min. készlet -->
+                        <div class="col-12 col-md-6">
+                            <label for="minStockLevel" class="form-label fw-semibold">
+                                Minimális készletszint (db)
+                            </label>
+                            <input type="number"
+                                   min="0"
+                                   id="minStockLevel"
+                                   th:field="*{minStockLevel}"
+                                   class="form-control"
+                                   th:errorclass="is-invalid"
+                                   placeholder="0">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('minStockLevel')}" th:errors="*{minStockLevel}">
+                                Nem lehet negatív.
+                            </div>
+                        </div>
+
+                        <!-- Checkboxok -->
+                        <div class="col-12">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="requiresExpiry"
+                                       th:field="*{requiresExpiry}">
+                                <label class="form-check-label fw-semibold" for="requiresExpiry">
+                                    Lejárati idő kezelése kötelező (FEFO kigyűjtési stratégia)
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="active"
+                                       th:field="*{active}">
+                                <label class="form-check-label fw-semibold" for="active">
+                                    Aktív termék (engedélyezett bevételezéshez és tároláshoz)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <a th:href="@{/admin/products}" class="btn btn-outline-secondary">
+                            Mégse
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Mentés
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
