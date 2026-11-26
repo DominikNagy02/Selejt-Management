@@ -1,4 +1,4 @@
-package hu.unideb.inf.kliens;
+package hu.unideb.inf.javafx;
 
 import javafx.application.Application;
 

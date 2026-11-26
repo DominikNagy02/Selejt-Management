@@ -1,7 +1,7 @@
-package hu.unideb.inf.kliens;
+package hu.unideb.inf.javafx;
 
-import hu.unideb.inf.kliens.controller.HelloController;
-import hu.unideb.inf.kliens.model.Model;
+import hu.unideb.inf.javafx.controller.HelloController;
+import hu.unideb.inf.javafx.model.Model;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
