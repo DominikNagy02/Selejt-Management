@@ -1,9 +1,12 @@
 package hu.unideb.inf.backend.controller;
 
 import hu.unideb.inf.backend.service.masterdata.WarehouseService;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.WarehouseRequest;
 import hu.unideb.inf.core.dto.WarehouseResponse;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -16,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Objects;
 
 @RestController
@@ -33,10 +35,11 @@ public class WarehouseController {
     }
 
     @GetMapping
-    public List<WarehouseResponse> findAll(
-            @RequestParam(name = "activeOnly", required = false) Boolean activeOnly
+    public PageResponse<WarehouseResponse> findAll(
+            @RequestParam(name = "activeOnly", required = false) Boolean activeOnly,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
-        return warehouseService.findAll(activeOnly);
+        return warehouseService.findAll(activeOnly, pageable);
     }
 
     @GetMapping("/{id}")

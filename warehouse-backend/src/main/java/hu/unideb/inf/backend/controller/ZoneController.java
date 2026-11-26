@@ -1,10 +1,13 @@
 package hu.unideb.inf.backend.controller;
 
 import hu.unideb.inf.backend.service.masterdata.ZoneService;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.ZoneRequest;
 import hu.unideb.inf.core.dto.ZoneResponse;
 import hu.unideb.inf.core.enums.ZoneType;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Objects;
 
 @RestController
@@ -34,12 +36,13 @@ public class ZoneController {
     }
 
     @GetMapping
-    public List<ZoneResponse> findAll(
+    public PageResponse<ZoneResponse> findAll(
             @RequestParam(name = "warehouseId", required = false) Long warehouseId,
             @RequestParam(name = "zoneType", required = false) ZoneType zoneType,
-            @RequestParam(name = "activeOnly", required = false) Boolean activeOnly
+            @RequestParam(name = "activeOnly", required = false) Boolean activeOnly,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
-        return zoneService.findAll(warehouseId, zoneType, activeOnly);
+        return zoneService.findAll(warehouseId, zoneType, activeOnly, pageable);
     }
 
     @GetMapping("/{id}")

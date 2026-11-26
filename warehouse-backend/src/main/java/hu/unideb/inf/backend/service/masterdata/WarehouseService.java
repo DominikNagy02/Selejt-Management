@@ -2,10 +2,12 @@ package hu.unideb.inf.backend.service.masterdata;
 
 import hu.unideb.inf.backend.model.entity.WarehouseEntity;
 import hu.unideb.inf.backend.repository.WarehouseRepository;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.WarehouseRequest;
 import hu.unideb.inf.core.dto.WarehouseResponse;
 import hu.unideb.inf.core.exception.DuplicateResourceException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +29,18 @@ public class WarehouseService {
         );
     }
 
-    public List<WarehouseResponse> findAll(Boolean activeOnly) {
-        List<WarehouseEntity> entities = Boolean.TRUE.equals(activeOnly)
+    public PageResponse<WarehouseResponse> findAll(Boolean activeOnly, Pageable pageable) {
+        boolean onlyActive = Boolean.TRUE.equals(activeOnly);
+        if (!onlyActive && pageable != null && pageable.isPaged()) {
+            return PageMapper.fromPage(warehouseRepository.findAll(pageable).map(this::toResponse));
+        }
+        List<WarehouseResponse> items = (onlyActive
                 ? warehouseRepository.findAllByActiveTrue()
-                : warehouseRepository.findAll();
-        return entities.stream()
+                : warehouseRepository.findAll())
+                .stream()
                 .map(this::toResponse)
                 .toList();
+        return PageMapper.paginate(items, pageable);
     }
 
     public WarehouseResponse findById(Long id) {

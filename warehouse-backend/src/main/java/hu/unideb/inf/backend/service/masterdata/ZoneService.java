@@ -4,11 +4,13 @@ import hu.unideb.inf.backend.model.entity.WarehouseEntity;
 import hu.unideb.inf.backend.model.entity.ZoneEntity;
 import hu.unideb.inf.backend.repository.WarehouseRepository;
 import hu.unideb.inf.backend.repository.ZoneRepository;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.ZoneRequest;
 import hu.unideb.inf.core.dto.ZoneResponse;
 import hu.unideb.inf.core.enums.ZoneType;
 import hu.unideb.inf.core.exception.DuplicateResourceException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +41,17 @@ public class ZoneService {
         );
     }
 
-    public List<ZoneResponse> findAll(Long warehouseId, ZoneType zoneType, Boolean activeOnly) {
+    public PageResponse<ZoneResponse> findAll(
+            Long warehouseId,
+            ZoneType zoneType,
+            Boolean activeOnly,
+            Pageable pageable
+    ) {
         boolean onlyActive = Boolean.TRUE.equals(activeOnly);
+        if (warehouseId == null && zoneType == null && !onlyActive && pageable != null && pageable.isPaged()) {
+            return PageMapper.fromPage(zoneRepository.findAll(pageable).map(this::toResponse));
+        }
+
         List<ZoneEntity> candidates;
         if (warehouseId != null) {
             candidates = onlyActive
@@ -52,11 +63,12 @@ public class ZoneService {
             candidates = zoneRepository.findAll();
         }
 
-        return candidates.stream()
+        List<ZoneResponse> items = candidates.stream()
                 .filter(zone -> zoneType == null || zone.getZoneType() == zoneType)
                 .filter(zone -> !onlyActive || zone.isActive())
                 .map(this::toResponse)
                 .toList();
+        return PageMapper.paginate(items, pageable);
     }
 
     public ZoneResponse findById(Long id) {
