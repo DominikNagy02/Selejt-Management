@@ -82,33 +82,19 @@
             <div class="card border-0 shadow-sm rounded-3 p-3">
                 <h5 class="fw-bold mb-3">Zónák Terheltsége (Súly & Térfogat)</h5>
 
-                <div class="mb-3">
+                <div th:each="zone : ${zoneLoads}" class="mb-3">
                     <div class="d-flex justify-content-between small fw-medium mb-1">
-                        <span>A-Zóna (Száraz raktár - Normál)</span>
-                        <span class="text-muted">4500 / 6000 kg (75%)</span>
+                        <span th:text="${zone.name}">A-Zóna (Száraz raktár - Normál)</span>
+                        <span th:class="${zone.detailsTextClass ?: 'text-muted'}"
+                              th:text="${zone.displayDetails}">4500 / 6000 kg (75%)</span>
                     </div>
                     <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-primary" role="progressbar" style="width: 75%"></div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between small fw-medium mb-1">
-                        <span>B-Zóna (Hűtött raktár)</span>
-                        <span class="text-danger fw-bold">1920 / 2000 kg (96% - Kritikus!)</span>
-                    </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-danger" role="progressbar" style="width: 96%"></div>
-                    </div>
-                </div>
-
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between small fw-medium mb-1">
-                        <span>C-Zóna (Veszélyes anyagok)</span>
-                        <span class="text-muted">320 / 1500 kg (21%)</span>
-                    </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: 21%"></div>
+                        <div th:class="|progress-bar ${zone.progressBarClass ?: 'bg-primary'}|"
+                             role="progressbar"
+                             th:style="|width: ${zone.percentage}%;|"
+                             th:aria-valuenow="${zone.percentage}"
+                             aria-valuemin="0"
+                             aria-valuemax="100"></div>
                     </div>
                 </div>
             </div>
@@ -118,19 +104,14 @@
             <div class="card border-0 shadow-sm rounded-3 p-3">
                 <h5 class="fw-bold mb-3">Készlet Riasztások (FEFO / Min. Készlet)</h5>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <li th:each="alert : ${stockAlerts}" class="list-group-item d-flex justify-content-between align-items-center px-0">
                         <div>
-                            <div class="fw-bold">Fékfolyadék DOT4 (SKU-1092)</div>
-                            <span class="badge bg-danger-subtle text-danger">Készlet: 3 db (Min: 10 db)</span>
+                            <div class="fw-bold" th:text="${alert.title}">Fékfolyadék DOT4 (SKU-1092)</div>
+                            <span th:class="|badge bg-${alert.badgeSeverity}-subtle text-${alert.badgeSeverity}|"
+                                  th:text="${alert.badgeText}">Készlet: 3 db (Min: 10 db)</span>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary">Rendelés</button>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <div>
-                            <div class="fw-bold">Szintetikus Motorolaj 5W30 (Lot-44)</div>
-                            <span class="badge bg-warning-subtle text-warning">Lejár: 14 napon belül</span>
-                        </div>
-                        <span class="text-muted small">Polc: A-02-1</span>
+                        <span th:if="${alert.location != null}" class="text-muted small" th:text="${alert.location}">Polc: A-02-1</span>
+                        <button th:if="${alert.actionLabel != null}" class="btn btn-sm btn-outline-primary" th:text="${alert.actionLabel}">Rendelés</button>
                     </li>
                 </ul>
             </div>
