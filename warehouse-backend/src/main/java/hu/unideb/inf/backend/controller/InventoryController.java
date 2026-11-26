@@ -1,9 +1,11 @@
 package hu.unideb.inf.backend.controller;
 
 import hu.unideb.inf.backend.service.inventory.InventoryService;
+import hu.unideb.inf.backend.service.suggestion.ShelfSuggestionService;
 import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.ShelfSuggestionResponse;
 import hu.unideb.inf.core.enums.InventoryStatus;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Objects;
 
 @RestController
@@ -24,11 +27,19 @@ import java.util.Objects;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final ShelfSuggestionService shelfSuggestionService;
 
-    public InventoryController(InventoryService inventoryService) {
+    public InventoryController(
+            InventoryService inventoryService,
+            ShelfSuggestionService shelfSuggestionService
+    ) {
         this.inventoryService = Objects.requireNonNull(
                 inventoryService,
                 "inventoryService must not be null"
+        );
+        this.shelfSuggestionService = Objects.requireNonNull(
+                shelfSuggestionService,
+                "shelfSuggestionService must not be null"
         );
     }
 
@@ -47,5 +58,15 @@ public class InventoryController {
     @ResponseStatus(HttpStatus.CREATED)
     public InboundResponse receive(@Valid @RequestBody InboundRequest request) {
         return inventoryService.receive(request);
+    }
+
+    @GetMapping("/suggest-shelf")
+    public List<ShelfSuggestionResponse> suggestShelf(
+            @RequestParam(name = "productId") Long productId,
+            @RequestParam(name = "quantity") int quantity,
+            @RequestParam(name = "warehouseId", required = false) Long warehouseId,
+            @RequestParam(name = "limit", required = false) Integer limit
+    ) {
+        return shelfSuggestionService.suggest(productId, quantity, warehouseId, limit);
     }
 }
