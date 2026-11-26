@@ -4,7 +4,7 @@ module hu.unideb.inf.javafx {
     requires java.net.http;
     requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.datatype.jsr310;
-    requires hu.unideb.inf.core;
+    //requires hu.unideb.inf.core;
 
     opens hu.unideb.inf.javafx to javafx.fxml;
     opens hu.unideb.inf.javafx.controller to javafx.fxml;
