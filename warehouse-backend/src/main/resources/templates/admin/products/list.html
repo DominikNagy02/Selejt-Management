@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="hu" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::main-body}, ~{::title})}">
+<head>
+    <title>Smart WMS - Terméktörzs</title>
+</head>
+<body>
+<div th:fragment="main-body">
+
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <span th:text="${successMessage}">Művelet sikeres!</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-0">Terméktörzs Katalógus</h3>
+            <p class="text-muted small mb-0">Termékek és zónakövetelmények karbantartása (FR-02)</p>
+        </div>
+        <div>
+            <a th:href="@{/admin/products/new}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i> Új Termék
+            </a>
+        </div>
+    </div>
+
+    <!-- Kereső és szűrő sáv -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 p-3">
+        <form th:action="@{/admin/products}" method="get" class="row g-2 align-items-center">
+            <div class="col-12 col-md-6 col-lg-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text"
+                           class="form-control border-start-0"
+                           name="query"
+                           th:value="${query}"
+                           placeholder="Keresés SKU, név vagy vonalkód alapján...">
+                </div>
+            </div>
+            <div class="col-12 col-md-4 col-lg-3">
+                <select name="zoneType" class="form-select form-select-sm">
+                    <option value="" th:selected="${selectedZoneType == null}">Minden zónatípus</option>
+                    <option th:each="zt : ${zoneTypes}"
+                            th:value="${zt}"
+                            th:text="${zt}"
+                            th:selected="${zt == selectedZoneType}">NORMAL</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 col-lg-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-funnel me-1"></i> Szűrés
+                </button>
+                <a th:href="@{/admin/products}" class="btn btn-outline-secondary btn-sm" title="Szűrők törlése">
+                    <i class="bi bi-x-circle"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Termékek táblázat -->
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">SKU</th>
+                        <th scope="col">Megnevezés</th>
+                        <th scope="col">Vonalkód</th>
+                        <th scope="col">Zónakövetelmény</th>
+                        <th scope="col">Egységsúly (kg)</th>
+                        <th scope="col">Térfogat (m³)</th>
+                        <th scope="col">Min. készlet</th>
+                        <th scope="col">Státusz</th>
+                        <th scope="col" class="text-end">Műveletek</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="p : ${products}">
+                        <td>
+                            <span class="fw-bold font-monospace" th:text="${p.sku}">SKU-1092</span>
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark" th:text="${p.name}">Fékfolyadék DOT4</div>
+                            <small th:if="${p.description != null}" class="text-muted d-block" th:text="${p.description}">Leírás</small>
+                        </td>
+                        <td>
+                            <span class="text-muted font-monospace small" th:text="${p.barcode}">5901234567890</span>
+                        </td>
+                        <td>
+                            <span th:if="${p.requiredZoneType != null and p.requiredZoneType.name() == 'NORMAL'}"
+                                  class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                <i class="bi bi-box me-1"></i> Normál
+                            </span>
+                            <span th:if="${p.requiredZoneType != null and p.requiredZoneType.name() == 'CHILLED'}"
+                                  class="badge bg-info-subtle text-info border border-info-subtle">
+                                <i class="bi bi-snow me-1"></i> Hűtött
+                            </span>
+                            <span th:if="${p.requiredZoneType != null and p.requiredZoneType.name() == 'HAZARDOUS'}"
+                                  class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                <i class="bi bi-exclamation-octagon me-1"></i> Veszélyes
+                            </span>
+                            <span th:if="${p.requiredZoneType == null}" class="badge bg-light text-muted">-</span>
+                        </td>
+                        <td>
+                            <span th:text="|${p.unitWeightKg} kg|">0.600 kg</span>
+                        </td>
+                        <td>
+                            <span th:text="|${p.unitVolumeM3} m³|">0.000800 m³</span>
+                        </td>
+                        <td>
+                            <span th:text="|${p.minStockLevel} db|">10 db</span>
+                        </td>
+                        <td>
+                            <span th:if="${p.active}" class="badge bg-success-subtle text-success">Aktív</span>
+                            <span th:unless="${p.active}" class="badge bg-secondary-subtle text-muted">Inaktív</span>
+                        </td>
+                        <td class="text-end">
+                            <a th:href="@{/admin/products/{id}/edit(id=${p.id})}"
+                               class="btn btn-outline-secondary btn-sm"
+                               title="Szerkesztés">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(products)}">
+                        <td colspan="9" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            Nincs a megadott keresési feltételeknek megfelelő termék a törzsben.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
