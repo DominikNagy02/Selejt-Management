@@ -6,6 +6,7 @@ import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.ShelfSuggestionResponse;
+import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.InventoryStatus;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -58,6 +59,11 @@ public class InventoryController {
     @ResponseStatus(HttpStatus.CREATED)
     public InboundResponse receive(@Valid @RequestBody InboundRequest request) {
         return inventoryService.receive(request);
+    }
+
+    @PostMapping("/transfer")
+    public InboundResponse transfer(@Valid @RequestBody TransferRequest request) {
+        return inventoryService.transfer(request);
     }
 
     @GetMapping("/suggest-shelf")

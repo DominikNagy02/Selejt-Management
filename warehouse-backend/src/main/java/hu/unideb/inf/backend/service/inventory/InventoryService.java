@@ -11,11 +11,13 @@ import hu.unideb.inf.backend.service.masterdata.PageMapper;
 import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.InventoryStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,6 +29,7 @@ import java.util.Objects;
 public class InventoryService {
 
     private final InboundValidator inboundValidator;
+    private final TransferValidator transferValidator;
     private final LotRepository lotRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final ShelfRepository shelfRepository;
@@ -34,6 +37,7 @@ public class InventoryService {
 
     public InventoryService(
             InboundValidator inboundValidator,
+            TransferValidator transferValidator,
             LotRepository lotRepository,
             InventoryItemRepository inventoryItemRepository,
             ShelfRepository shelfRepository,
@@ -42,6 +46,10 @@ public class InventoryService {
         this.inboundValidator = Objects.requireNonNull(
                 inboundValidator,
                 "inboundValidator must not be null"
+        );
+        this.transferValidator = Objects.requireNonNull(
+                transferValidator,
+                "transferValidator must not be null"
         );
         this.lotRepository = Objects.requireNonNull(
                 lotRepository,
@@ -125,6 +133,112 @@ public class InventoryService {
                 savedItem.getStatus(),
                 now
         );
+    }
+
+    @Transactional
+    public InboundResponse transfer(TransferRequest request) {
+        TransferValidationContext context = transferValidator.validate(request);
+
+        InventoryItemEntity sourceItem = context.sourceItem();
+        ProductEntity product = context.product();
+        LotEntity lot = sourceItem.getLot();
+        ShelfEntity sourceShelf = context.sourceShelf();
+        ShelfEntity targetShelf = context.targetShelf();
+        int quantity = request.quantity();
+        Instant sourceReceivedAt = sourceItem.getReceivedAt();
+
+        int remainingQuantity = sourceItem.getQuantity() - quantity;
+        sourceItem.setQuantity(remainingQuantity);
+        if (remainingQuantity == 0) {
+            sourceItem.setStatus(InventoryStatus.DEPLETED);
+        }
+        inventoryItemRepository.save(sourceItem);
+
+        InventoryItemEntity savedTarget = upsertTransferredItem(
+                targetShelf,
+                lot,
+                context.targetTierLevel(),
+                quantity,
+                sourceReceivedAt
+        );
+
+        ShelfEntity updatedTargetShelf = targetShelf;
+        if (!context.sameShelf()) {
+            BigDecimal movedWeight = product.getUnitWeightKg().multiply(BigDecimal.valueOf(quantity));
+            BigDecimal movedVolume = product.getUnitVolumeM3().multiply(BigDecimal.valueOf(quantity));
+
+            sourceShelf.setCurrentWeightKg(
+                    sourceShelf.getCurrentWeightKg().subtract(movedWeight).max(BigDecimal.ZERO)
+            );
+            sourceShelf.setCurrentVolumeM3(
+                    sourceShelf.getCurrentVolumeM3().subtract(movedVolume).max(BigDecimal.ZERO)
+            );
+            shelfRepository.save(sourceShelf);
+
+            targetShelf.setCurrentWeightKg(context.targetCapacityResult().newWeight());
+            targetShelf.setCurrentVolumeM3(context.targetCapacityResult().newVolume());
+            updatedTargetShelf = shelfRepository.save(targetShelf);
+        }
+
+        return new InboundResponse(
+                savedTarget.getId(),
+                product.getId(),
+                product.getSku(),
+                product.getName(),
+                updatedTargetShelf.getId(),
+                updatedTargetShelf.getCode(),
+                savedTarget.getTierLevel(),
+                lot.getLotNumber(),
+                lot.getExpirationDate(),
+                savedTarget.getQuantity(),
+                updatedTargetShelf.getCurrentWeightKg(),
+                updatedTargetShelf.getCurrentVolumeM3(),
+                savedTarget.getStatus(),
+                savedTarget.getReceivedAt()
+        );
+    }
+
+    private InventoryItemEntity upsertTransferredItem(
+            ShelfEntity targetShelf,
+            LotEntity lot,
+            int targetTierLevel,
+            int movedQuantity,
+            Instant sourceReceivedAt
+    ) {
+        InventoryItemEntity targetItem = inventoryItemRepository
+                .findByShelfIdAndLotIdAndTierLevel(targetShelf.getId(), lot.getId(), targetTierLevel)
+                .map(existing -> mergeTransferredQuantity(existing, movedQuantity, sourceReceivedAt))
+                .orElseGet(() -> new InventoryItemEntity(
+                        targetShelf,
+                        lot,
+                        targetTierLevel,
+                        movedQuantity,
+                        0,
+                        InventoryStatus.STORED,
+                        sourceReceivedAt
+                ));
+        return inventoryItemRepository.save(targetItem);
+    }
+
+    private InventoryItemEntity mergeTransferredQuantity(
+            InventoryItemEntity existing,
+            int movedQuantity,
+            Instant sourceReceivedAt
+    ) {
+        if (existing.getStatus() == InventoryStatus.DEPLETED) {
+            existing.setStatus(InventoryStatus.STORED);
+            existing.setQuantity(movedQuantity);
+            existing.setReservedQuantity(0);
+            existing.setReceivedAt(sourceReceivedAt);
+        } else {
+            existing.setQuantity(existing.getQuantity() + movedQuantity);
+            if (sourceReceivedAt != null
+                    && (existing.getReceivedAt() == null
+                    || sourceReceivedAt.isBefore(existing.getReceivedAt()))) {
+                existing.setReceivedAt(sourceReceivedAt);
+            }
+        }
+        return existing;
     }
 
     private LotEntity upsertLot(ProductEntity product, String batchNumber, LocalDate expirationDate) {
