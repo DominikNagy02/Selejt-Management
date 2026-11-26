@@ -3,6 +3,7 @@ package hu.unideb.inf.backend.controller;
 import hu.unideb.inf.backend.config.ClockConfig;
 import hu.unideb.inf.backend.service.masterdata.WarehouseService;
 import hu.unideb.inf.backend.service.masterdata.ZoneService;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.WarehouseRequest;
 import hu.unideb.inf.core.dto.WarehouseResponse;
 import hu.unideb.inf.core.dto.ZoneRequest;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -51,16 +53,21 @@ class WarehouseAndZoneControllerTest {
         WarehouseResponse active = new WarehouseResponse(1L, "WH-01", "Debrecen", "Kassai út 26.", true, NOW, NOW);
         WarehouseResponse inactive = new WarehouseResponse(1L, "WH-01", "Debrecen", "Kassai út 26.", false, NOW, NOW);
 
-        when(warehouseService.findAll(true)).thenReturn(List.of(active));
+        PageResponse<WarehouseResponse> page = new PageResponse<>(List.of(active), 0, 10, 1, 1, true, true);
+        when(warehouseService.findAll(eq(true), any(Pageable.class))).thenReturn(page);
         when(warehouseService.findById(1L)).thenReturn(active);
         when(warehouseService.create(any(WarehouseRequest.class))).thenReturn(active);
         when(warehouseService.update(eq(1L), any(WarehouseRequest.class))).thenReturn(active);
         when(warehouseService.deactivate(1L)).thenReturn(inactive);
         when(warehouseService.findById(99L)).thenThrow(ResourceNotFoundException.of("Warehouse", 99L));
 
-        mockMvc.perform(get("/api/v1/warehouses").param("activeOnly", "true"))
+        mockMvc.perform(get("/api/v1/warehouses")
+                        .param("activeOnly", "true")
+                        .param("page", "0")
+                        .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("WH-01"));
+                .andExpect(jsonPath("$.content[0].code").value("WH-01"))
+                .andExpect(jsonPath("$.totalElements").value(1));
 
         mockMvc.perform(get("/api/v1/warehouses/1"))
                 .andExpect(status().isOk())
@@ -104,7 +111,8 @@ class WarehouseAndZoneControllerTest {
         ZoneResponse zone = new ZoneResponse(10L, 1L, "Z-CHILL", "Hűtött zóna", ZoneType.CHILLED, true, NOW, NOW);
         ZoneResponse inactiveZone = new ZoneResponse(10L, 1L, "Z-CHILL", "Hűtött zóna", ZoneType.CHILLED, false, NOW, NOW);
 
-        when(zoneService.findAll(1L, ZoneType.CHILLED, true)).thenReturn(List.of(zone));
+        PageResponse<ZoneResponse> page = new PageResponse<>(List.of(zone), 0, 10, 1, 1, true, true);
+        when(zoneService.findAll(eq(1L), eq(ZoneType.CHILLED), eq(true), any(Pageable.class))).thenReturn(page);
         when(zoneService.findById(10L)).thenReturn(zone);
         when(zoneService.create(any(ZoneRequest.class)))
                 .thenReturn(zone)
@@ -115,9 +123,12 @@ class WarehouseAndZoneControllerTest {
         mockMvc.perform(get("/api/v1/zones")
                         .param("warehouseId", "1")
                         .param("zoneType", "CHILLED")
-                        .param("activeOnly", "true"))
+                        .param("activeOnly", "true")
+                        .param("page", "0")
+                        .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].zoneType").value("CHILLED"));
+                .andExpect(jsonPath("$.content[0].zoneType").value("CHILLED"))
+                .andExpect(jsonPath("$.totalElements").value(1));
 
         mockMvc.perform(get("/api/v1/zones/10"))
                 .andExpect(status().isOk())

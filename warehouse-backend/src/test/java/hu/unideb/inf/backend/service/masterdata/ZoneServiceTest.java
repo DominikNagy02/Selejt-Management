@@ -14,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.List;
@@ -43,22 +46,25 @@ class ZoneServiceTest {
     }
 
     @Test
-    void findAllSupportsWarehouseZoneTypeAndActiveFilters() {
+    void findAllSupportsWarehouseZoneTypeActiveFiltersAndPagination() {
         WarehouseEntity wh = warehouse(1L, "WH-01");
         ZoneEntity normalActive = zone(10L, wh, "Z-A", "Normál", ZoneType.NORMAL, true);
         ZoneEntity chilledInactive = zone(11L, wh, "Z-B", "Hűtött", ZoneType.CHILLED, false);
+        Pageable pageable = PageRequest.of(0, 10);
 
         when(zoneRepository.findByWarehouseId(1L)).thenReturn(List.of(normalActive, chilledInactive));
         when(zoneRepository.findByWarehouseIdAndActiveTrue(1L)).thenReturn(List.of(normalActive));
         when(zoneRepository.findByZoneTypeAndActiveTrue(ZoneType.NORMAL)).thenReturn(List.of(normalActive));
         when(zoneRepository.findAll()).thenReturn(List.of(normalActive, chilledInactive));
+        when(zoneRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(normalActive, chilledInactive), pageable, 2));
 
-        assertEquals(2, zoneService.findAll(1L, null, false).size());
-        assertEquals(1, zoneService.findAll(1L, ZoneType.CHILLED, false).size());
-        assertEquals(1, zoneService.findAll(1L, null, true).size());
-        assertEquals(1, zoneService.findAll(null, ZoneType.NORMAL, true).size());
-        assertEquals(1, zoneService.findAll(null, null, true).size());
-        assertEquals(2, zoneService.findAll(null, null, null).size());
+        assertEquals(2, zoneService.findAll(1L, null, false, pageable).content().size());
+        assertEquals(1, zoneService.findAll(1L, ZoneType.CHILLED, false, pageable).content().size());
+        assertEquals(1, zoneService.findAll(1L, null, true, pageable).content().size());
+        assertEquals(1, zoneService.findAll(null, ZoneType.NORMAL, true, pageable).content().size());
+        assertEquals(1, zoneService.findAll(null, null, true, pageable).content().size());
+        assertEquals(2, zoneService.findAll(null, null, null, pageable).content().size());
+        assertEquals(2, zoneService.findAll(null, null, null, Pageable.unpaged()).content().size());
     }
 
     @Test

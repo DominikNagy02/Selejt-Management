@@ -2,6 +2,7 @@ package hu.unideb.inf.backend.service.masterdata;
 
 import hu.unideb.inf.backend.model.entity.WarehouseEntity;
 import hu.unideb.inf.backend.repository.WarehouseRepository;
+import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.dto.WarehouseRequest;
 import hu.unideb.inf.core.dto.WarehouseResponse;
 import hu.unideb.inf.core.exception.DuplicateResourceException;
@@ -11,6 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,19 +42,22 @@ class WarehouseServiceTest {
     }
 
     @Test
-    void findAllReturnsAllOrOnlyActiveWarehouses() {
+    void findAllReturnsAllOrOnlyActiveWarehousesWithPagination() {
         WarehouseEntity active = entity(1L, "WH-01", "Debrecen", "Kassai út 26.", true);
         WarehouseEntity inactive = entity(2L, "WH-02", "Régi", null, false);
+        Pageable pageRequest = PageRequest.of(0, 10);
+        when(warehouseRepository.findAll(pageRequest)).thenReturn(new PageImpl<>(List.of(active, inactive), pageRequest, 2));
         when(warehouseRepository.findAll()).thenReturn(List.of(active, inactive));
         when(warehouseRepository.findAllByActiveTrue()).thenReturn(List.of(active));
 
-        assertEquals(2, warehouseService.findAll(null).size());
-        assertEquals(2, warehouseService.findAll(false).size());
+        assertEquals(2, warehouseService.findAll(null, pageRequest).content().size());
+        assertEquals(2, warehouseService.findAll(false, Pageable.unpaged()).content().size());
 
-        List<WarehouseResponse> onlyActive = warehouseService.findAll(true);
-        assertEquals(1, onlyActive.size());
-        assertEquals("WH-01", onlyActive.get(0).code());
-        assertTrue(onlyActive.get(0).active());
+        PageResponse<WarehouseResponse> onlyActive = warehouseService.findAll(true, pageRequest);
+        assertEquals(1, onlyActive.content().size());
+        assertEquals("WH-01", onlyActive.content().get(0).code());
+        assertTrue(onlyActive.content().get(0).active());
+        assertEquals(1, onlyActive.totalElements());
     }
 
     @Test
