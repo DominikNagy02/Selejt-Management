@@ -1,6 +1,7 @@
 package hu.unideb.inf.core.exception;
 
 import hu.unideb.inf.core.enums.TaskStatus;
+import hu.unideb.inf.core.enums.ZoneType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -48,6 +49,28 @@ class CoreExceptionTest {
         assertEquals(409, duplicate.getHttpStatus());
         assertEquals("duplicate-resource", duplicate.getErrorCode());
         assertTrue(duplicate.getMessage().contains("WH-01"));
+
+        var zoneMismatch = new ZoneMismatchException("SKU-MILK", ZoneType.CHILLED, "S-01", ZoneType.NORMAL);
+        assertEquals("SKU-MILK", zoneMismatch.getProductSku());
+        assertEquals(ZoneType.CHILLED, zoneMismatch.getRequiredZoneType());
+        assertEquals("S-01", zoneMismatch.getShelfCode());
+        assertEquals(ZoneType.NORMAL, zoneMismatch.getActualZoneType());
+        assertEquals(409, zoneMismatch.getHttpStatus());
+        assertEquals("zone-mismatch", zoneMismatch.getErrorCode());
+        assertTrue(zoneMismatch.getMessage().contains("CHILLED"));
+
+        var sameLocation = InvalidTransferException.sameLocation("S-01", 0);
+        assertEquals(400, sameLocation.getHttpStatus());
+        assertEquals("invalid-transfer", sameLocation.getErrorCode());
+        assertTrue(sameLocation.getMessage().contains("S-01"));
+
+        var sourceMismatch = InvalidTransferException.sourceLocationMismatch(5L, "S-02", 1);
+        assertEquals(409, sourceMismatch.getHttpStatus());
+        assertTrue(sourceMismatch.getMessage().contains("S-02"));
+
+        var customTransfer = new InvalidTransferException("Érvénytelen áthelyezés");
+        assertEquals(400, customTransfer.getHttpStatus());
+        assertEquals("Érvénytelen áthelyezés", customTransfer.getMessage());
 
         var insufficient = new InsufficientStockException("SKU-001", 10, 3);
         assertEquals("SKU-001", insufficient.getProductSku());
