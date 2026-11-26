@@ -6,9 +6,14 @@ import hu.unideb.inf.backend.service.suggestion.ShelfSuggestionService;
 import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.ScrapRequest;
 import hu.unideb.inf.core.dto.ShelfSuggestionResponse;
+import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.InventoryStatus;
 import hu.unideb.inf.core.enums.ZoneType;
+import hu.unideb.inf.core.exception.InsufficientStockException;
+import hu.unideb.inf.core.exception.InvalidTransferException;
+import hu.unideb.inf.core.exception.ReservationConflictException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import hu.unideb.inf.core.exception.ZoneMismatchException;
@@ -131,5 +136,93 @@ class InventoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].shelfCode").value("S-04-12"))
                 .andExpect(jsonPath("$[0].zoneType").value("NORMAL"));
+    }
+
+    @Test
+    void transferAndScrapEndpointsReturnExpectedResponsesAndErrors() throws Exception {
+        InboundResponse moved = new InboundResponse(
+                885L, 102L, "SKU-102", "Csavar", 46L, "S-04-13", 1,
+                "BATCH-2026-A1", LocalDate.of(2027, 12, 31), 20,
+                new BigDecimal("120.000"), new BigDecimal("0.800000"),
+                InventoryStatus.STORED, NOW
+        );
+        InboundResponse scrapped = new InboundResponse(
+                884L, 102L, "SKU-102", "Csavar", 45L, "S-04-12", 0,
+                "BATCH-2026-A1", LocalDate.of(2027, 12, 31), 30,
+                new BigDecimal("200.000"), new BigDecimal("1.350000"),
+                InventoryStatus.STORED, NOW
+        );
+
+        when(inventoryService.transfer(any(TransferRequest.class)))
+                .thenReturn(moved)
+                .thenThrow(InvalidTransferException.sameLocation("S-04-12", 0))
+                .thenThrow(new InsufficientStockException("SKU-102", 80, 30))
+                .thenThrow(new ShelfCapacityExceededException("S-04-13", new BigDecimal("500"), new BigDecimal("540"), "kg"));
+        when(inventoryService.scrap(any(ScrapRequest.class)))
+                .thenReturn(scrapped)
+                .thenThrow(new ReservationConflictException(884L, 10, 4));
+
+        String validTransferBody = """
+                {
+                  "inventoryId": 884,
+                  "fromShelfId": 45,
+                  "fromTierLevel": 0,
+                  "toShelfId": 46,
+                  "toTierLevel": 1,
+                  "quantity": 20,
+                  "reason": "Átrendezés"
+                }
+                """;
+        mockMvc.perform(post("/api/v1/inventory/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTransferBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inventoryItemId").value(885))
+                .andExpect(jsonPath("$.shelfCode").value("S-04-13"));
+
+        mockMvc.perform(post("/api/v1/inventory/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTransferBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-transfer"));
+
+        mockMvc.perform(post("/api/v1/inventory/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTransferBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/insufficient-stock"));
+
+        mockMvc.perform(post("/api/v1/inventory/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTransferBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/shelf-capacity-exceeded"));
+
+        String validScrapBody = """
+                {
+                  "inventoryId": 884,
+                  "quantity": 10,
+                  "reason": "Sérült csomagolás"
+                }
+                """;
+        mockMvc.perform(post("/api/v1/inventory/scrap")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validScrapBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(30));
+
+        mockMvc.perform(post("/api/v1/inventory/scrap")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validScrapBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/reservation-conflict"));
+
+        mockMvc.perform(post("/api/v1/inventory/scrap")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"inventoryId":884,"quantity":5,"reason":"   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.reason").isNotEmpty());
     }
 }
