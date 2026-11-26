@@ -5,6 +5,7 @@ import hu.unideb.inf.backend.service.suggestion.ShelfSuggestionService;
 import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.ScrapRequest;
 import hu.unideb.inf.core.dto.ShelfSuggestionResponse;
 import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.InventoryStatus;
@@ -64,6 +65,11 @@ public class InventoryController {
     @PostMapping("/transfer")
     public InboundResponse transfer(@Valid @RequestBody TransferRequest request) {
         return inventoryService.transfer(request);
+    }
+
+    @PostMapping("/scrap")
+    public InboundResponse scrap(@Valid @RequestBody ScrapRequest request) {
+        return inventoryService.scrap(request);
     }
 
     @GetMapping("/suggest-shelf")

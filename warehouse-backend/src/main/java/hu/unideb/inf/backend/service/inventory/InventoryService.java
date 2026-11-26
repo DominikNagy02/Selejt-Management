@@ -11,8 +11,12 @@ import hu.unideb.inf.backend.service.masterdata.PageMapper;
 import hu.unideb.inf.core.dto.InboundRequest;
 import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.ScrapRequest;
 import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.InventoryStatus;
+import hu.unideb.inf.core.exception.InsufficientStockException;
+import hu.unideb.inf.core.exception.ReservationConflictException;
+import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -164,15 +168,7 @@ public class InventoryService {
 
         ShelfEntity updatedTargetShelf = targetShelf;
         if (!context.sameShelf()) {
-            BigDecimal movedWeight = product.getUnitWeightKg().multiply(BigDecimal.valueOf(quantity));
-            BigDecimal movedVolume = product.getUnitVolumeM3().multiply(BigDecimal.valueOf(quantity));
-
-            sourceShelf.setCurrentWeightKg(
-                    sourceShelf.getCurrentWeightKg().subtract(movedWeight).max(BigDecimal.ZERO)
-            );
-            sourceShelf.setCurrentVolumeM3(
-                    sourceShelf.getCurrentVolumeM3().subtract(movedVolume).max(BigDecimal.ZERO)
-            );
+            subtractShelfLoad(sourceShelf, product, quantity);
             shelfRepository.save(sourceShelf);
 
             targetShelf.setCurrentWeightKg(context.targetCapacityResult().newWeight());
@@ -196,6 +192,64 @@ public class InventoryService {
                 savedTarget.getStatus(),
                 savedTarget.getReceivedAt()
         );
+    }
+
+    @Transactional
+    public InboundResponse scrap(ScrapRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        Instant now = Instant.now(clock);
+
+        InventoryItemEntity item = inventoryItemRepository.findById(request.inventoryId())
+                .orElseThrow(() -> ResourceNotFoundException.of("InventoryItem", request.inventoryId()));
+
+        LotEntity lot = item.getLot();
+        ProductEntity product = lot.getProduct();
+        ShelfEntity shelf = item.getShelf();
+
+        int unreservedQuantity = item.getStatus() == InventoryStatus.DEPLETED
+                ? 0
+                : Math.max(0, item.getQuantity() - item.getReservedQuantity());
+
+        if (request.quantity() > unreservedQuantity) {
+            if (item.getReservedQuantity() > 0 && request.quantity() <= item.getQuantity()) {
+                throw new ReservationConflictException(item.getId(), request.quantity(), unreservedQuantity);
+            }
+            throw new InsufficientStockException(product.getSku(), request.quantity(), unreservedQuantity);
+        }
+
+        int remainingQuantity = item.getQuantity() - request.quantity();
+        item.setQuantity(remainingQuantity);
+        if (remainingQuantity == 0) {
+            item.setStatus(InventoryStatus.DEPLETED);
+        }
+        InventoryItemEntity savedItem = inventoryItemRepository.save(item);
+
+        subtractShelfLoad(shelf, product, request.quantity());
+        ShelfEntity savedShelf = shelfRepository.save(shelf);
+
+        return new InboundResponse(
+                savedItem.getId(),
+                product.getId(),
+                product.getSku(),
+                product.getName(),
+                savedShelf.getId(),
+                savedShelf.getCode(),
+                savedItem.getTierLevel(),
+                lot.getLotNumber(),
+                lot.getExpirationDate(),
+                savedItem.getQuantity(),
+                savedShelf.getCurrentWeightKg(),
+                savedShelf.getCurrentVolumeM3(),
+                savedItem.getStatus(),
+                now
+        );
+    }
+
+    private void subtractShelfLoad(ShelfEntity shelf, ProductEntity product, int quantity) {
+        BigDecimal removedWeight = product.getUnitWeightKg().multiply(BigDecimal.valueOf(quantity));
+        BigDecimal removedVolume = product.getUnitVolumeM3().multiply(BigDecimal.valueOf(quantity));
+        shelf.setCurrentWeightKg(shelf.getCurrentWeightKg().subtract(removedWeight).max(BigDecimal.ZERO));
+        shelf.setCurrentVolumeM3(shelf.getCurrentVolumeM3().subtract(removedVolume).max(BigDecimal.ZERO));
     }
 
     private InventoryItemEntity upsertTransferredItem(
