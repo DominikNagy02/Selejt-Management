@@ -2,6 +2,10 @@
 spring:
   application:
     name: warehouse-backend
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
 
 wms:
   picking:

@@ -20,6 +20,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
@@ -138,6 +139,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsOptimisticLockingFailureTo409ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/test/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/optimistic-lock-conflict"))
+                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value(
+                        "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra."
+                ))
+                .andExpect(jsonPath("$.instance").value("/api/v1/test/optimistic-lock"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
+
+    @Test
     void mapsMethodArgumentNotValidTo400ProblemDetailWithFieldErrors() throws Exception {
         String invalidJson = """
                 {
@@ -240,6 +255,11 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/api/v1/tasks/{id}/accept")
         public void invalidTaskState(@PathVariable("id") Long id) {
             throw new InvalidTaskStateException(id, TaskStatus.COMPLETED, TaskStatus.IN_PROGRESS);
+        }
+
+        @PostMapping("/api/v1/test/optimistic-lock")
+        public void optimisticLock() {
+            throw new ObjectOptimisticLockingFailureException("InventoryItem", 1L);
         }
 
         @PostMapping("/api/v1/inventory/validate")

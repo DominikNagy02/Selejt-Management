@@ -5,4 +5,3 @@ public enum ZoneType {
     CHILLED,
     HAZARDOUS
 }
-

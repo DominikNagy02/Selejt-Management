@@ -3,6 +3,7 @@ package hu.unideb.inf.backend.controller;
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import hu.unideb.inf.core.exception.WmsBusinessException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,9 +26,14 @@ public class GlobalExceptionHandler {
     public static final String VALIDATION_ERROR_CODE = "validation-failed";
     public static final String VALIDATION_ERROR_TITLE = "Validation Failed";
     public static final String VALIDATION_ERROR_DETAIL = "A kérés adatai érvénytelenek.";
+    public static final String OPTIMISTIC_LOCK_ERROR_CODE = "optimistic-lock-conflict";
+    public static final String OPTIMISTIC_LOCK_ERROR_TITLE = "Optimistic Lock Conflict";
+    public static final String OPTIMISTIC_LOCK_ERROR_DETAIL =
+            "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra.";
     public static final String MALFORMED_REQUEST_CODE = "malformed-request";
     public static final String MALFORMED_REQUEST_TITLE = "Malformed Request";
-    public static final String MALFORMED_REQUEST_DETAIL = "A kérés törzse nem olvasható vagy hibás JSON formátumú.";
+    public static final String MALFORMED_REQUEST_DETAIL =
+            "A kérés törzse nem olvasható vagy hibás JSON formátumú.";
     public static final String INTERNAL_ERROR_CODE = "internal-error";
     public static final String INTERNAL_ERROR_TITLE = "Internal Server Error";
     public static final String INTERNAL_ERROR_DETAIL = "Váratlan szerverhiba történt.";
@@ -36,6 +42,20 @@ public class GlobalExceptionHandler {
 
     public GlobalExceptionHandler(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(
+            OptimisticLockingFailureException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.CONFLICT,
+                OPTIMISTIC_LOCK_ERROR_CODE,
+                OPTIMISTIC_LOCK_ERROR_TITLE,
+                OPTIMISTIC_LOCK_ERROR_DETAIL,
+                request
+        );
     }
 
     @ExceptionHandler(ShelfCapacityExceededException.class)
