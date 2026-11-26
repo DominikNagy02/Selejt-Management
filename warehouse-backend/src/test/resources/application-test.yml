@@ -9,9 +9,9 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
   flyway:
-    enabled: false
+    enabled: true

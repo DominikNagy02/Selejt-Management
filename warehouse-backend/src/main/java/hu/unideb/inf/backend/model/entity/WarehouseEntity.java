@@ -42,7 +42,7 @@ public class WarehouseEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "warehouse", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private List<ZoneEntity> zones = new ArrayList<>();
 
     public WarehouseEntity() {
@@ -160,6 +160,7 @@ public class WarehouseEntity {
                 "id=" + id +
                 ", code='" + code + '\'' +
                 ", name='" + name + '\'' +
+                ", address='" + address + '\'' +
                 ", active=" + active +
                 '}';
     }

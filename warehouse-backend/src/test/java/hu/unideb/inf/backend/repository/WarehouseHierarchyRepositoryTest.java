@@ -193,4 +193,41 @@ class WarehouseHierarchyRepositoryTest {
         assertFalse(wh.equals(null));
         assertFalse(wh.equals("different-type"));
     }
+
+    @Test
+    @DisplayName("Fizikai törlés megakadályozása ha van alárendelt elem (ON DELETE RESTRICT és soft-delete védelem)")
+    void restrictDeleteWhenChildEntitiesExist() {
+        WarehouseEntity wh = new WarehouseEntity("WH-DEL-RESTRICT", "Törlésvédett raktár", null, true);
+        ZoneEntity zone = new ZoneEntity(wh, "Z-DEL-RESTRICT", "Törlésvédett zóna", ZoneType.NORMAL, true);
+        ShelfEntity shelf = new ShelfEntity(
+                zone,
+                "SH-DEL-RESTRICT",
+                StorageType.RACK,
+                1,
+                new BigDecimal("100.000"),
+                new BigDecimal("1.000000"),
+                true
+        );
+        zone.addShelf(shelf);
+        wh.addZone(zone);
+        warehouseRepository.saveAndFlush(wh);
+
+        entityManager.clear();
+
+        // Raktárat nem lehet fizikailag törölni, amíg zóna tartozik hozzá (ON DELETE RESTRICT)
+        WarehouseEntity reloadedWh = warehouseRepository.findByCode("WH-DEL-RESTRICT").orElseThrow();
+        assertThrows(DataIntegrityViolationException.class, () -> {
+            warehouseRepository.delete(reloadedWh);
+            warehouseRepository.flush();
+        });
+
+        entityManager.clear();
+
+        // Zónát nem lehet fizikailag törölni, amíg polc tartozik hozzá (ON DELETE RESTRICT)
+        ZoneEntity reloadedZone = zoneRepository.findByWarehouseIdAndCode(reloadedWh.getId(), "Z-DEL-RESTRICT").orElseThrow();
+        assertThrows(DataIntegrityViolationException.class, () -> {
+            zoneRepository.delete(reloadedZone);
+            zoneRepository.flush();
+        });
+    }
 }
