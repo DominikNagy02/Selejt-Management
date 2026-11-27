@@ -4,16 +4,24 @@ import hu.unideb.inf.backend.model.entity.DeliveryOrderEntity;
 import hu.unideb.inf.backend.model.entity.DeliveryOrderLineEntity;
 import hu.unideb.inf.backend.model.entity.LotEntity;
 import hu.unideb.inf.backend.model.entity.ProductEntity;
+import hu.unideb.inf.backend.model.entity.StockReservationEntity;
+import hu.unideb.inf.backend.model.entity.TaskEntity;
+import hu.unideb.inf.backend.model.entity.TaskLineEntity;
 import hu.unideb.inf.backend.repository.DeliveryOrderRepository;
 import hu.unideb.inf.backend.repository.LotRepository;
 import hu.unideb.inf.backend.repository.ProductRepository;
+import hu.unideb.inf.backend.repository.StockReservationRepository;
+import hu.unideb.inf.backend.repository.TaskRepository;
 import hu.unideb.inf.backend.service.masterdata.PageMapper;
+import hu.unideb.inf.backend.service.reservation.StockReservationService;
 import hu.unideb.inf.core.dto.DeliveryOrderCreateRequest;
 import hu.unideb.inf.core.dto.DeliveryOrderItemRequest;
 import hu.unideb.inf.core.dto.DeliveryOrderItemResponse;
 import hu.unideb.inf.core.dto.DeliveryOrderResponse;
 import hu.unideb.inf.core.dto.PageResponse;
 import hu.unideb.inf.core.enums.DeliveryOrderStatus;
+import hu.unideb.inf.core.enums.ReservationStatus;
+import hu.unideb.inf.core.enums.TaskStatus;
 import hu.unideb.inf.core.exception.DuplicateResourceException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Pageable;
@@ -35,12 +43,18 @@ public class DeliveryOrderService {
     private final DeliveryOrderRepository deliveryOrderRepository;
     private final ProductRepository productRepository;
     private final LotRepository lotRepository;
+    private final TaskRepository taskRepository;
+    private final StockReservationRepository stockReservationRepository;
+    private final StockReservationService stockReservationService;
     private final Clock clock;
 
     public DeliveryOrderService(
             DeliveryOrderRepository deliveryOrderRepository,
             ProductRepository productRepository,
             LotRepository lotRepository,
+            TaskRepository taskRepository,
+            StockReservationRepository stockReservationRepository,
+            StockReservationService stockReservationService,
             Clock clock
     ) {
         this.deliveryOrderRepository = Objects.requireNonNull(
@@ -49,6 +63,15 @@ public class DeliveryOrderService {
         );
         this.productRepository = Objects.requireNonNull(productRepository, "productRepository must not be null");
         this.lotRepository = Objects.requireNonNull(lotRepository, "lotRepository must not be null");
+        this.taskRepository = Objects.requireNonNull(taskRepository, "taskRepository must not be null");
+        this.stockReservationRepository = Objects.requireNonNull(
+                stockReservationRepository,
+                "stockReservationRepository must not be null"
+        );
+        this.stockReservationService = Objects.requireNonNull(
+                stockReservationService,
+                "stockReservationService must not be null"
+        );
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
@@ -120,6 +143,44 @@ public class DeliveryOrderService {
             ));
         }
 
+        return toResponse(deliveryOrderRepository.saveAndFlush(order));
+    }
+
+    @Transactional
+    public DeliveryOrderResponse cancel(Long id, String reason) {
+        DeliveryOrderEntity order = getOrderOrThrow(id);
+        if (order.getStatus() == DeliveryOrderStatus.SHIPPED || order.getStatus() == DeliveryOrderStatus.CANCELLED) {
+            throw new IllegalArgumentException(
+                    "A(z) " + order.getStatus() + " státuszú kiszállítási megbízás nem vonható vissza."
+            );
+        }
+
+        Instant now = Instant.now(clock);
+        for (DeliveryOrderLineEntity line : order.getLines()) {
+            for (StockReservationEntity reservation : stockReservationRepository.findByDeliveryOrderLineId(line.getId())) {
+                if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+                    stockReservationService.release(reservation.getId());
+                }
+            }
+        }
+
+        for (TaskEntity task : taskRepository.findByDeliveryOrderId(order.getId())) {
+            if (task.getStatus() == TaskStatus.PENDING || task.getStatus() == TaskStatus.IN_PROGRESS) {
+                for (TaskLineEntity taskLine : task.getLines()) {
+                    for (StockReservationEntity reservation : stockReservationRepository.findByTaskLineId(taskLine.getId())) {
+                        if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+                            stockReservationService.release(reservation.getId());
+                        }
+                    }
+                }
+                task.setStatus(TaskStatus.CANCELLED);
+                task.setCancelReason(reason != null && !reason.isBlank() ? reason.trim() : "Delivery order cancelled");
+                task.setCancelledAt(now);
+                taskRepository.saveAndFlush(task);
+            }
+        }
+
+        order.setStatus(DeliveryOrderStatus.CANCELLED);
         return toResponse(deliveryOrderRepository.saveAndFlush(order));
     }
 

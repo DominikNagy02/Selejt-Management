@@ -17,18 +17,26 @@ import hu.unideb.inf.backend.repository.ShelfRepository;
 import hu.unideb.inf.backend.repository.StockReservationRepository;
 import hu.unideb.inf.backend.repository.TaskLineRepository;
 import hu.unideb.inf.backend.repository.TaskRepository;
+import hu.unideb.inf.backend.service.inventory.InventoryService;
 import hu.unideb.inf.backend.service.masterdata.PageMapper;
 import hu.unideb.inf.backend.service.reservation.ReservationCommand;
 import hu.unideb.inf.backend.service.reservation.StockReservationService;
+import hu.unideb.inf.core.dto.InboundResponse;
 import hu.unideb.inf.core.dto.PageResponse;
+import hu.unideb.inf.core.dto.ScrapRequest;
+import hu.unideb.inf.core.dto.TaskCompleteRequest;
 import hu.unideb.inf.core.dto.TaskCreateRequest;
 import hu.unideb.inf.core.dto.TaskLineRequest;
 import hu.unideb.inf.core.dto.TaskLineResponse;
 import hu.unideb.inf.core.dto.TaskResponse;
+import hu.unideb.inf.core.dto.TransferRequest;
 import hu.unideb.inf.core.enums.DeliveryOrderStatus;
+import hu.unideb.inf.core.enums.ReservationStatus;
 import hu.unideb.inf.core.enums.ReservationType;
+import hu.unideb.inf.core.enums.Role;
 import hu.unideb.inf.core.enums.TaskStatus;
 import hu.unideb.inf.core.enums.TaskType;
+import hu.unideb.inf.core.exception.ForbiddenOperationException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import hu.unideb.inf.core.exception.ZoneMismatchException;
 import hu.unideb.inf.shared.schemas.ValidationConstants;
@@ -56,6 +64,8 @@ public class TaskService {
     private final ShelfRepository shelfRepository;
     private final StockReservationRepository stockReservationRepository;
     private final StockReservationService stockReservationService;
+    private final TaskStateMachine taskStateMachine;
+    private final InventoryService inventoryService;
     private final Clock clock;
 
     public TaskService(
@@ -68,6 +78,8 @@ public class TaskService {
             ShelfRepository shelfRepository,
             StockReservationRepository stockReservationRepository,
             StockReservationService stockReservationService,
+            TaskStateMachine taskStateMachine,
+            InventoryService inventoryService,
             Clock clock
     ) {
         this.taskRepository = Objects.requireNonNull(taskRepository, "taskRepository must not be null");
@@ -91,6 +103,8 @@ public class TaskService {
                 stockReservationService,
                 "stockReservationService must not be null"
         );
+        this.taskStateMachine = Objects.requireNonNull(taskStateMachine, "taskStateMachine must not be null");
+        this.inventoryService = Objects.requireNonNull(inventoryService, "inventoryService must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
@@ -165,6 +179,179 @@ public class TaskService {
         }
 
         return toResponse(taskRepository.saveAndFlush(task));
+    }
+
+    @Transactional
+    public TaskResponse accept(Long taskId, Long workerId) {
+        Objects.requireNonNull(workerId, "workerId must not be null");
+        TaskEntity task = getTaskOrThrow(taskId);
+        taskStateMachine.transition(taskId, task.getStatus(), TaskStatus.IN_PROGRESS);
+        if (task.getAssignedTo() != null && !task.getAssignedTo().equals(workerId)) {
+            throw new ForbiddenOperationException("A feladat már másik raktároshoz van hozzárendelve.");
+        }
+
+        task.setAssignedTo(workerId);
+        task.setStatus(TaskStatus.IN_PROGRESS);
+        task.setStartedAt(Instant.now(clock));
+        return toResponse(taskRepository.saveAndFlush(task));
+    }
+
+    @Transactional
+    public TaskResponse complete(Long taskId, TaskCompleteRequest request, Long actorId, Role actorRole) {
+        Objects.requireNonNull(request, "request must not be null");
+        Objects.requireNonNull(actorId, "actorId must not be null");
+        TaskEntity task = getTaskOrThrow(taskId);
+        if (actorRole == Role.WORKER && !Objects.equals(task.getAssignedTo(), actorId)) {
+            throw new ForbiddenOperationException("Csak a feladathoz kijelölt raktáros zárhatja le a feladatot.");
+        }
+
+        taskStateMachine.transition(taskId, task.getStatus(), TaskStatus.COMPLETED);
+        verifyScannedShelfCode(task, request.scannedShelfCode().trim());
+
+        for (TaskLineEntity line : task.getLines()) {
+            switch (task.getTaskType()) {
+                case PICKING -> completePickingLine(line);
+                case TRANSFER -> completeTransferLine(line, request.note());
+                case SCRAP -> completeScrapLine(line, request.note());
+                case PUTAWAY -> line.setConfirmedQuantity(line.getQuantity());
+            }
+            taskLineRepository.saveAndFlush(line);
+        }
+
+        updateDeliveryOrderIfPicked(task.getDeliveryOrder());
+
+        task.setStatus(TaskStatus.COMPLETED);
+        task.setCompletedAt(Instant.now(clock));
+        if (request.note() != null && !request.note().isBlank()) {
+            task.setNote(request.note().trim());
+        }
+        return toResponse(taskRepository.saveAndFlush(task));
+    }
+
+    @Transactional
+    public TaskResponse cancel(Long taskId, String reason, Long actorId, Role actorRole) {
+        Objects.requireNonNull(actorId, "actorId must not be null");
+        TaskEntity task = getTaskOrThrow(taskId);
+        if (actorRole == Role.WORKER) {
+            if (task.getStatus() != TaskStatus.IN_PROGRESS || !Objects.equals(task.getAssignedTo(), actorId)) {
+                throw new ForbiddenOperationException(
+                        "Raktáros csak saját, folyamatban lévő (IN_PROGRESS) feladatot szakíthat meg."
+                );
+            }
+            if (reason == null || reason.isBlank()) {
+                throw new IllegalArgumentException("Raktárosi megszakításhoz indoklás megadása kötelező.");
+            }
+        }
+
+        taskStateMachine.transition(taskId, task.getStatus(), TaskStatus.CANCELLED);
+        for (TaskLineEntity line : task.getLines()) {
+            releaseActiveLineReservations(line);
+        }
+
+        task.setStatus(TaskStatus.CANCELLED);
+        task.setCancelReason(reason != null && !reason.isBlank() ? reason.trim() : null);
+        task.setCancelledAt(Instant.now(clock));
+        return toResponse(taskRepository.saveAndFlush(task));
+    }
+
+    private void verifyScannedShelfCode(TaskEntity task, String scannedShelfCode) {
+        boolean matched = task.getLines().stream()
+                .map(line -> expectedShelfForCompletion(task.getTaskType(), line))
+                .filter(Objects::nonNull)
+                .anyMatch(shelf -> shelf.getCode().equalsIgnoreCase(scannedShelfCode));
+        if (!matched) {
+            throw new IllegalArgumentException(
+                    "A beolvasott polckód (" + scannedShelfCode + ") nem egyezik a feladat polcával."
+            );
+        }
+    }
+
+    private ShelfEntity expectedShelfForCompletion(TaskType taskType, TaskLineEntity line) {
+        return (taskType == TaskType.PICKING || taskType == TaskType.SCRAP)
+                ? line.getSourceShelf()
+                : line.getTargetShelf();
+    }
+
+    private void completePickingLine(TaskLineEntity line) {
+        for (StockReservationEntity reservation : stockReservationRepository.findByTaskLineId(line.getId())) {
+            if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+                stockReservationService.consume(reservation.getId());
+            }
+        }
+        line.setConfirmedQuantity(line.getQuantity());
+        DeliveryOrderLineEntity doLine = line.getDeliveryOrderLine();
+        if (doLine != null) {
+            doLine.setPickedQuantity(Math.min(doLine.getQuantity(), doLine.getPickedQuantity() + line.getQuantity()));
+        }
+    }
+
+    private void completeTransferLine(TaskLineEntity line, String note) {
+        releaseActiveLineReservations(line);
+
+        InventoryItemEntity sourceItem = inventoryItemRepository.findById(line.getSourceItem().getId())
+                .orElseThrow(() -> ResourceNotFoundException.of("InventoryItem", line.getSourceItem().getId()));
+
+        List<StockReservationEntity> otherActiveReservations = List.of();
+        int reboundQty = 0;
+        if (line.getQuantity() == sourceItem.getQuantity() && sourceItem.getReservedQuantity() > 0) {
+            otherActiveReservations = stockReservationRepository.findByInventoryItemIdAndStatus(
+                    sourceItem.getId(),
+                    ReservationStatus.ACTIVE
+            );
+            reboundQty = otherActiveReservations.stream().mapToInt(StockReservationEntity::getQuantity).sum();
+            sourceItem.setReservedQuantity(Math.max(0, sourceItem.getReservedQuantity() - reboundQty));
+            inventoryItemRepository.saveAndFlush(sourceItem);
+        }
+
+        InboundResponse moved = inventoryService.transfer(new TransferRequest(
+                sourceItem.getId(),
+                line.getSourceShelf().getId(),
+                defaultTier(line.getSourceTierLevel()),
+                line.getTargetShelf().getId(),
+                defaultTier(line.getTargetTierLevel()),
+                line.getQuantity(),
+                note
+        ));
+
+        if (!otherActiveReservations.isEmpty()) {
+            InventoryItemEntity targetItem = inventoryItemRepository.findById(moved.inventoryItemId())
+                    .orElseThrow(() -> ResourceNotFoundException.of("InventoryItem", moved.inventoryItemId()));
+            targetItem.setReservedQuantity(targetItem.getReservedQuantity() + reboundQty);
+            inventoryItemRepository.saveAndFlush(targetItem);
+            for (StockReservationEntity reservation : otherActiveReservations) {
+                reservation.setInventoryItem(targetItem);
+                stockReservationRepository.saveAndFlush(reservation);
+            }
+        }
+
+        line.setConfirmedQuantity(line.getQuantity());
+    }
+
+    private void completeScrapLine(TaskLineEntity line, String note) {
+        releaseActiveLineReservations(line);
+        String reason = note != null && !note.isBlank() ? note.trim() : "Selejtezési feladat lezárva";
+        inventoryService.scrap(new ScrapRequest(line.getSourceItem().getId(), line.getQuantity(), reason));
+        line.setConfirmedQuantity(line.getQuantity());
+    }
+
+    private void releaseActiveLineReservations(TaskLineEntity line) {
+        for (StockReservationEntity reservation : stockReservationRepository.findByTaskLineId(line.getId())) {
+            if (reservation.getStatus() == ReservationStatus.ACTIVE) {
+                stockReservationService.release(reservation.getId());
+            }
+        }
+    }
+
+    private void updateDeliveryOrderIfPicked(DeliveryOrderEntity order) {
+        if (order == null || order.getLines().isEmpty()) {
+            return;
+        }
+        boolean allPicked = order.getLines().stream()
+                .allMatch(line -> line.getPickedQuantity() >= line.getQuantity());
+        if (allPicked) {
+            order.setStatus(DeliveryOrderStatus.PICKED);
+            deliveryOrderRepository.saveAndFlush(order);
+        }
     }
 
     private DeliveryOrderEntity resolveDeliveryOrder(TaskCreateRequest request) {

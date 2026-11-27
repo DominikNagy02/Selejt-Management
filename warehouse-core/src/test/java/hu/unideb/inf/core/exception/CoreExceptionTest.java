@@ -72,6 +72,11 @@ class CoreExceptionTest {
         assertEquals(400, customTransfer.getHttpStatus());
         assertEquals("Érvénytelen áthelyezés", customTransfer.getMessage());
 
+        var forbidden = new ForbiddenOperationException("Tiltott művelet");
+        assertEquals(403, forbidden.getHttpStatus());
+        assertEquals("forbidden-operation", forbidden.getErrorCode());
+        assertEquals("Tiltott művelet", forbidden.getMessage());
+
         var insufficient = new InsufficientStockException("SKU-001", 10, 3);
         assertEquals("SKU-001", insufficient.getProductSku());
         assertEquals(10, insufficient.getRequestedQuantity());
