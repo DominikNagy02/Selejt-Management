@@ -96,7 +96,7 @@ class CapacityCalculatorTest {
                 "kg"
         );
         assertEquals(
-                "A polc (S-04-12) kapacitása meghaladná a maximális 500 kg értéket. Számított új érték: 540.5 kg.",
+                "A polc (S-04-12) teherbírása meghaladná a maximális 500 kg-ot. Számított új súly: 540.5 kg.",
                 weightEx.getMessage()
         );
         assertEquals("weight", weightEx.getViolations().get(0).dimension());
@@ -106,6 +106,10 @@ class CapacityCalculatorTest {
                 new BigDecimal("5.000"),
                 new BigDecimal("5.250"),
                 "m³"
+        );
+        assertEquals(
+                "A polc (S-04-12) térfogata meghaladná a maximális 5 m³-t. Számított új térfogat: 5.25 m³.",
+                volumeEx.getMessage()
         );
         assertEquals("volume", volumeEx.getViolations().get(0).dimension());
 

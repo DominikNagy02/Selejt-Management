@@ -58,5 +58,20 @@ class FifoPickingStrategyTest {
         assertEquals(10L, allocations.get(0).inventoryItemId());
         assertEquals(20L, allocations.get(1).inventoryItemId());
     }
+
+    @Test
+    void allocateShouldPickHigherTierFirstWhenReceivedAtIsEqual() {
+        Instant sameTime = Instant.parse("2026-10-05T09:00:00Z");
+        StockLot tierZero = new StockLot(1L, "G-01", 0, "BATCH-T0", 10, sameTime, null);
+        StockLot tierTwo = new StockLot(2L, "G-01", 2, "BATCH-T2", 10, sameTime, null);
+        StockLot tierOne = new StockLot(3L, "G-01", 1, "BATCH-T1", 10, sameTime, null);
+
+        List<Allocation> allocations = strategy.allocate(List.of(tierZero, tierTwo, tierOne), 25);
+
+        assertEquals(3, allocations.size());
+        assertEquals(new Allocation(2L, "G-01", 2, "BATCH-T2", 10), allocations.get(0));
+        assertEquals(new Allocation(3L, "G-01", 1, "BATCH-T1", 10), allocations.get(1));
+        assertEquals(new Allocation(1L, "G-01", 0, "BATCH-T0", 5), allocations.get(2));
+    }
 }
 

@@ -6,6 +6,7 @@ public class FifoPickingStrategy extends AbstractPickingStrategy {
 
     private static final Comparator<StockLot> FIFO_COMPARATOR =
             Comparator.comparing(StockLot::receivedAt)
+                    .thenComparing(StockLot::tierLevel, Comparator.reverseOrder())
                     .thenComparing(StockLot::inventoryItemId);
 
     @Override

@@ -10,6 +10,7 @@ public class FefoPickingStrategy extends AbstractPickingStrategy {
     private static final Comparator<StockLot> FEFO_COMPARATOR =
             Comparator.comparing(StockLot::expirationDate, Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(StockLot::receivedAt)
+                    .thenComparing(StockLot::tierLevel, Comparator.reverseOrder())
                     .thenComparing(StockLot::inventoryItemId);
 
     private final Clock clock;

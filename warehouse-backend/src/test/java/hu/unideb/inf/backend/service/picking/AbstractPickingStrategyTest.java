@@ -62,6 +62,30 @@ class AbstractPickingStrategyTest {
         assertEquals(30, totalAllocated);
     }
 
+    @Test
+    void allocateShouldPropagateTierLevelToAllocations() {
+        StockLot tierTwo = new StockLot(
+                10L, "G-01", 2, "BATCH-2", 5,
+                Instant.parse("2026-10-01T08:00:00Z"), null
+        );
+        StockLot tierOne = new StockLot(
+                11L, "G-01", 1, "BATCH-1", 5,
+                Instant.parse("2026-10-02T08:00:00Z"), null
+        );
+        StockLot tierZero = new StockLot(
+                12L, "G-01", 0, "BATCH-0", 5,
+                Instant.parse("2026-10-03T08:00:00Z"), null
+        );
+
+        List<Allocation> allocations = strategy.allocate(List.of(tierZero, tierOne, tierTwo), 12);
+
+        assertEquals(3, allocations.size());
+        assertEquals(new Allocation(10L, "G-01", 2, "BATCH-2", 5), allocations.get(0));
+        assertEquals(new Allocation(11L, "G-01", 1, "BATCH-1", 5), allocations.get(1));
+        assertEquals(new Allocation(12L, "G-01", 0, "BATCH-0", 2), allocations.get(2));
+        assertEquals(List.of(2, 1, 0), allocations.stream().map(Allocation::tierLevel).toList());
+    }
+
     // F3.7 + F3.11: 100 kért darab, 60 elérhető -> InsufficientStockException
     @Test
     void allocateShouldThrowInsufficientStockExceptionWhenTotalStockIsNotEnough() {
@@ -109,7 +133,15 @@ class AbstractPickingStrategyTest {
 
         assertThrows(
                 IllegalArgumentException.class,
+                () -> new StockLot(1L, "S-01", -1, "B-1", 5, Instant.now(), null)
+        );
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> new StockLot(1L, "S-01", "B-1", -1, Instant.now(), null)
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new Allocation(1L, "S-01", -1, "B-1", 5)
         );
         assertThrows(
                 IllegalArgumentException.class,

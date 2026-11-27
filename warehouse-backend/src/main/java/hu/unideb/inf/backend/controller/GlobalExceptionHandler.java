@@ -3,14 +3,16 @@ package hu.unideb.inf.backend.controller;
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import hu.unideb.inf.core.exception.WmsBusinessException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.time.Clock;
@@ -28,15 +30,20 @@ public class GlobalExceptionHandler {
     public static final String VALIDATION_ERROR_DETAIL = "A kérés adatai érvénytelenek.";
     public static final String OPTIMISTIC_LOCK_ERROR_CODE = "optimistic-lock-conflict";
     public static final String OPTIMISTIC_LOCK_ERROR_TITLE = "Optimistic Lock Conflict";
-    public static final String OPTIMISTIC_LOCK_ERROR_DETAIL = "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra.";
+    public static final String OPTIMISTIC_LOCK_ERROR_DETAIL =
+            "Az erőforrás időközben módosult. Kérjük, frissítse az adatokat és próbálja újra.";
+    public static final String MALFORMED_REQUEST_CODE = "malformed-request";
+    public static final String MALFORMED_REQUEST_TITLE = "Malformed Request";
+    public static final String MALFORMED_REQUEST_DETAIL =
+            "A kérés törzse nem olvasható vagy hibás JSON formátumú.";
+    public static final String INVALID_PARAMETER_CODE = "invalid-parameter";
+    public static final String INVALID_PARAMETER_TITLE = "Invalid Request Parameter";
+    public static final String INTERNAL_ERROR_CODE = "internal-error";
+    public static final String INTERNAL_ERROR_TITLE = "Internal Server Error";
+    public static final String INTERNAL_ERROR_DETAIL = "Váratlan szerverhiba történt.";
 
     private final Clock clock;
 
-    public GlobalExceptionHandler() {
-        this(Clock.systemUTC());
-    }
-
-    @Autowired
     public GlobalExceptionHandler(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
@@ -97,6 +104,79 @@ public class GlobalExceptionHandler {
         );
         pd.setProperty("errors", errors);
         return pd;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleMalformedRequest(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                MALFORMED_REQUEST_CODE,
+                MALFORMED_REQUEST_TITLE,
+                MALFORMED_REQUEST_DETAIL,
+                request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingRequestParameter(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                "Hiányzó kötelező paraméter: " + ex.getParameterName(),
+                request
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                "Érvénytelen paraméterérték: " + ex.getName(),
+                request
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(
+            IllegalArgumentException ex,
+            HttpServletRequest request
+    ) {
+        String detail = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : VALIDATION_ERROR_DETAIL;
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                INVALID_PARAMETER_CODE,
+                INVALID_PARAMETER_TITLE,
+                detail,
+                request
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpectedException(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                INTERNAL_ERROR_CODE,
+                INTERNAL_ERROR_TITLE,
+                INTERNAL_ERROR_DETAIL,
+                request
+        );
     }
 
     private ProblemDetail problem(

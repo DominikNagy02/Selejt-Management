@@ -96,5 +96,22 @@ class FefoPickingStrategyTest {
         assertEquals(10, ex.getRequestedQuantity());
         assertEquals(0, ex.getAvailableQuantity());
     }
+
+    @Test
+    void allocateShouldPickHigherTierFirstWhenExpirationAndReceivedAtAreEqual() {
+        Instant sameTime = Instant.parse("2026-10-05T09:00:00Z");
+        LocalDate sameExpiry = TODAY.plusDays(14);
+        StockLot tierZero = new StockLot(1L, "G-01", 0, "BATCH-T0", 10, sameTime, sameExpiry);
+        StockLot tierTwo = new StockLot(2L, "G-01", 2, "BATCH-T2", 10, sameTime, sameExpiry);
+        StockLot tierOne = new StockLot(3L, "G-01", 1, "BATCH-T1", 10, sameTime, sameExpiry);
+
+        List<Allocation> allocations = strategy.allocate(List.of(tierZero, tierTwo, tierOne), 25);
+
+        assertEquals(3, allocations.size());
+        assertEquals(List.of(2, 1, 0), allocations.stream().map(Allocation::tierLevel).toList());
+        assertEquals(new Allocation(2L, "G-01", 2, "BATCH-T2", 10), allocations.get(0));
+        assertEquals(new Allocation(3L, "G-01", 1, "BATCH-T1", 10), allocations.get(1));
+        assertEquals(new Allocation(1L, "G-01", 0, "BATCH-T0", 5), allocations.get(2));
+    }
 }
 

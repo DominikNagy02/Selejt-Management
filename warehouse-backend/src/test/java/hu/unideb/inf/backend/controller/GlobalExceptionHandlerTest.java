@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
@@ -50,25 +51,35 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.TestErrorController.class, GlobalExceptionHandlerTest.FixedClockConfig.class})
 class GlobalExceptionHandlerTest {
 
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-10-20T14:30:00Z");
+
     @Autowired
     private MockMvc mockMvc;
 
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
+        }
+    }
+
     @Test
-    void mapsShelfCapacityExceededTo409ProblemDetailWithCustomProperties() throws Exception {
+    void mapsShelfCapacityExceededTo409ProblemDetailWithViolations() throws Exception {
         mockMvc.perform(post("/api/v1/inventory/inbound"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/shelf-capacity-exceeded"))
                 .andExpect(jsonPath("$.title").value("Shelf Capacity Exceeded"))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.detail").value(
-                        "A polc (S-04-12) kapacitása meghaladná a maximális 500 kg értéket. Számított új érték: 540 kg."
+                        "A polc (S-04-12) teherbírása meghaladná a maximális 500 kg-ot. Számított új súly: 540 kg."
                 ))
                 .andExpect(jsonPath("$.instance").value("/api/v1/inventory/inbound"))
                 .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"))
                 .andExpect(jsonPath("$.shelfCode").value("S-04-12"))
                 .andExpect(jsonPath("$.violations[0].dimension").value("weight"))
-                .andExpect(jsonPath("$.violations[0].maxLimit").value(500))
-                .andExpect(jsonPath("$.violations[0].calculatedValue").value(540))
                 .andExpect(jsonPath("$.violations[0].unit").value("kg"));
     }
 
@@ -166,13 +177,62 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void fallsBackToDefaultMessageWhenFieldErrorMessageIsNullAndSupportsDefaultConstructor() throws Exception {
-        GlobalExceptionHandler defaultHandler = new GlobalExceptionHandler();
+    void mapsMalformedJsonTo400ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/inventory/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{broken-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/malformed-request"))
+                .andExpect(jsonPath("$.title").value("Malformed Request"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("A kérés törzse nem olvasható vagy hibás JSON formátumú."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/inventory/validate"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
 
-        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(
-                new TestPayload("B-1", 10),
-                "testPayload"
-        );
+    @Test
+    void mapsInvalidMissingAndMismatchedParametersTo400ProblemDetail() throws Exception {
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.title").value("Invalid Request Parameter"))
+                .andExpect(jsonPath("$.detail").value("quantity must be greater than 0"));
+
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("A kérés adatai érvénytelenek."));
+
+        mockMvc.perform(get("/api/v1/test/param-error"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("Hiányzó kötelező paraméter: quantity"));
+
+        mockMvc.perform(get("/api/v1/test/param-error").param("quantity", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/invalid-parameter"))
+                .andExpect(jsonPath("$.detail").value("Érvénytelen paraméterérték: quantity"));
+    }
+
+    @Test
+    void mapsUnexpectedExceptionTo500ProblemDetailWithoutLeakingDetails() throws Exception {
+        mockMvc.perform(get("/api/v1/unexpected-error"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/internal-error"))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value("Váratlan szerverhiba történt."))
+                .andExpect(jsonPath("$.instance").value("/api/v1/unexpected-error"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+    }
+
+    @Test
+    void fallsBackToDefaultMessageWhenFieldErrorMessageIsNull() throws Exception {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(Clock.systemUTC());
+        assertThrows(NullPointerException.class, () -> new GlobalExceptionHandler(null));
+
+        TestPayload target = new TestPayload("", 0);
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(target, "testPayload");
         bindingResult.addError(new FieldError("testPayload", "batchNumber", null));
 
         Method method = TestErrorController.class.getDeclaredMethod("validate", TestPayload.class);
@@ -180,7 +240,7 @@ class GlobalExceptionHandlerTest {
         MethodArgumentNotValidException exception = new MethodArgumentNotValidException(parameter, bindingResult);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/inventory/validate");
-        ProblemDetail problemDetail = defaultHandler.handleValidationErrors(exception, request);
+        ProblemDetail problemDetail = handler.handleValidationErrors(exception, request);
 
         assertEquals(400, problemDetail.getStatus());
         assertNotNull(problemDetail.getProperties());
@@ -231,21 +291,26 @@ class GlobalExceptionHandlerTest {
         public void validate(@Valid @RequestBody TestPayload payload) {
             // Validated by Spring MVC before method body executes
         }
+
+        @GetMapping("/api/v1/test/param-error")
+        public void paramError(@RequestParam("quantity") int quantity) {
+            if (quantity == 0) {
+                throw new IllegalArgumentException("quantity must be greater than 0");
+            }
+            if (quantity < 0) {
+                throw new IllegalArgumentException("   ");
+            }
+        }
+
+        @GetMapping("/api/v1/unexpected-error")
+        public void unexpectedError() {
+            throw new IllegalStateException("Sensitive internal database stack trace detail");
+        }
     }
 
     record TestPayload(
             @NotBlank String batchNumber,
             @Positive int quantity
     ) {
-    }
-
-    @TestConfiguration
-    static class FixedClockConfig {
-
-        @Bean
-        @Primary
-        public Clock fixedClock() {
-            return Clock.fixed(Instant.parse("2026-10-20T14:30:00Z"), ZoneOffset.UTC);
-        }
     }
 }

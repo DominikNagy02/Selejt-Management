@@ -24,10 +24,7 @@ public class ShelfCapacityExceededException extends WmsBusinessException {
     ) {
         this(
                 shelfCode,
-                maxLimit,
-                calculatedValue,
-                unit,
-                buildMessage(shelfCode, maxLimit, calculatedValue, unit)
+                List.of(new CapacityViolation(resolveDimension(unit), maxLimit, calculatedValue, unit))
         );
     }
 
@@ -47,15 +44,19 @@ public class ShelfCapacityExceededException extends WmsBusinessException {
 
     public ShelfCapacityExceededException(
             String shelfCode,
+            List<CapacityViolation> violations
+    ) {
+        this(shelfCode, violations, buildMessage(shelfCode, violations));
+    }
+
+    public ShelfCapacityExceededException(
+            String shelfCode,
             List<CapacityViolation> violations,
             String message
     ) {
         super(ERROR_CODE, TITLE, 409, message);
         this.shelfCode = Objects.requireNonNull(shelfCode, "shelfCode must not be null");
-        Objects.requireNonNull(violations, "violations must not be null");
-        if (violations.isEmpty()) {
-            throw new IllegalArgumentException("violations must not be empty");
-        }
+        validateViolations(violations);
         this.violations = List.copyOf(violations);
         CapacityViolation primary = this.violations.get(0);
         this.maxLimit = primary.maxLimit();
@@ -74,15 +75,51 @@ public class ShelfCapacityExceededException extends WmsBusinessException {
         return "m³".equals(unit) ? "volume" : "weight";
     }
 
-    private static String buildMessage(
-            String shelfCode,
-            BigDecimal maxLimit,
-            BigDecimal calculatedValue,
-            String unit
-    ) {
+    private static void validateViolations(List<CapacityViolation> violations) {
+        Objects.requireNonNull(violations, "violations must not be null");
+        if (violations.isEmpty()) {
+            throw new IllegalArgumentException("violations must not be empty");
+        }
+    }
+
+    private static String buildMessage(String shelfCode, List<CapacityViolation> violations) {
+        Objects.requireNonNull(shelfCode, "shelfCode must not be null");
+        validateViolations(violations);
+
+        if (violations.size() > 1) {
+            CapacityViolation weightViolation = violations.get(0);
+            CapacityViolation volumeViolation = violations.get(1);
+            return String.format(
+                    "A polc (%s) súly- és térfogatkorlátja is túllépésre kerülne: súly %s / %s %s, térfogat %s / %s %s.",
+                    shelfCode,
+                    formatDecimal(weightViolation.calculatedValue()),
+                    formatDecimal(weightViolation.maxLimit()),
+                    weightViolation.unit(),
+                    formatDecimal(volumeViolation.calculatedValue()),
+                    formatDecimal(volumeViolation.maxLimit()),
+                    volumeViolation.unit()
+            );
+        }
+
+        CapacityViolation violation = violations.get(0);
+        if ("volume".equals(violation.dimension())) {
+            return String.format(
+                    "A polc (%s) térfogata meghaladná a maximális %s %s-t. Számított új térfogat: %s %s.",
+                    shelfCode,
+                    formatDecimal(violation.maxLimit()),
+                    violation.unit(),
+                    formatDecimal(violation.calculatedValue()),
+                    violation.unit()
+            );
+        }
+
         return String.format(
-                "A polc (%s) kapacitása meghaladná a maximális %s %s értéket. Számított új érték: %s %s.",
-                shelfCode, formatDecimal(maxLimit), unit, formatDecimal(calculatedValue), unit
+                "A polc (%s) teherbírása meghaladná a maximális %s %s-ot. Számított új súly: %s %s.",
+                shelfCode,
+                formatDecimal(violation.maxLimit()),
+                violation.unit(),
+                formatDecimal(violation.calculatedValue()),
+                violation.unit()
         );
     }
 

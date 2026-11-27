@@ -132,6 +132,7 @@ class InventoryRepositoryTest {
         StockLot stockLot = savedItem.toStockLot();
         assertEquals(savedItem.getId(), stockLot.inventoryItemId());
         assertEquals("SH-INV-01", stockLot.shelfCode());
+        assertEquals(1, stockLot.tierLevel());
         assertEquals("LOT-2026-A1", stockLot.batchNumber());
         assertEquals(80, stockLot.availableQuantity());
         assertEquals(LocalDate.of(2026, 12, 31), stockLot.expirationDate());
