@@ -118,7 +118,7 @@ public class StockReservationService {
         }
 
         Instant now = Instant.now(clock);
-        Instant expiresAt = now.plus(Duration.ofMinutes(wmsProperties.reservation().timeoutMinutes()));
+        Instant expiresAt = calculateExpiry(now);
 
         List<StockReservationEntity> created = new ArrayList<>(allocations.size());
         for (Allocation allocation : allocations) {
@@ -129,7 +129,7 @@ public class StockReservationService {
             }
 
             item.setReservedQuantity(item.getReservedQuantity() + allocation.quantity());
-            inventoryItemRepository.save(item);
+            inventoryItemRepository.saveAndFlush(item);
 
             StockReservationEntity reservation = new StockReservationEntity(
                     item,
@@ -141,7 +141,8 @@ public class StockReservationService {
                     expiresAt,
                     command.createdBy()
             );
-            created.add(stockReservationRepository.save(reservation));
+            reservation.setCreatedAt(now);
+            created.add(stockReservationRepository.saveAndFlush(reservation));
         }
 
         return created;
@@ -153,16 +154,25 @@ public class StockReservationService {
         InventoryItemEntity item = reservation.getInventoryItem();
         int updatedReserved = Math.max(0, item.getReservedQuantity() - reservation.getQuantity());
         item.setReservedQuantity(updatedReserved);
-        inventoryItemRepository.save(item);
+        inventoryItemRepository.saveAndFlush(item);
 
         reservation.setStatus(ReservationStatus.RELEASED);
         reservation.setClosedAt(Instant.now(clock));
-        return stockReservationRepository.save(reservation);
+        return stockReservationRepository.saveAndFlush(reservation);
     }
 
     @Transactional
     public StockReservationEntity consume(Long reservationId) {
         StockReservationEntity reservation = getActiveReservationOrThrow(reservationId);
+        Instant now = Instant.now(clock);
+        if (reservation.getExpiresAt() != null && !reservation.getExpiresAt().isAfter(now)) {
+            throw new ReservationConflictException(
+                    reservation.getInventoryItem().getId(),
+                    reservation.getQuantity(),
+                    0
+            );
+        }
+
         InventoryItemEntity item = reservation.getInventoryItem();
         int quantity = reservation.getQuantity();
         if (item.getQuantity() < quantity || item.getReservedQuantity() < quantity) {
@@ -175,7 +185,7 @@ public class StockReservationService {
         if (remainingQuantity == 0) {
             item.setStatus(InventoryStatus.DEPLETED);
         }
-        inventoryItemRepository.save(item);
+        inventoryItemRepository.saveAndFlush(item);
 
         ProductEntity product = item.getLot().getProduct();
         ShelfEntity shelf = item.getShelf();
@@ -183,11 +193,35 @@ public class StockReservationService {
         BigDecimal removedVolume = product.getUnitVolumeM3().multiply(BigDecimal.valueOf(quantity));
         shelf.setCurrentWeightKg(shelf.getCurrentWeightKg().subtract(removedWeight).max(BigDecimal.ZERO));
         shelf.setCurrentVolumeM3(shelf.getCurrentVolumeM3().subtract(removedVolume).max(BigDecimal.ZERO));
-        shelfRepository.save(shelf);
+        shelfRepository.saveAndFlush(shelf);
 
         reservation.setStatus(ReservationStatus.CONSUMED);
-        reservation.setClosedAt(Instant.now(clock));
-        return stockReservationRepository.save(reservation);
+        reservation.setClosedAt(now);
+        return stockReservationRepository.saveAndFlush(reservation);
+    }
+
+    @Transactional
+    public int expireOverdueReservations() {
+        Instant now = Instant.now(clock);
+        List<StockReservationEntity> expired = stockReservationRepository.findByStatusAndExpiresAtBefore(
+                ReservationStatus.ACTIVE,
+                now
+        );
+        for (StockReservationEntity reservation : expired) {
+            InventoryItemEntity item = reservation.getInventoryItem();
+            item.setReservedQuantity(Math.max(0, item.getReservedQuantity() - reservation.getQuantity()));
+            inventoryItemRepository.saveAndFlush(item);
+
+            reservation.setStatus(ReservationStatus.EXPIRED);
+            reservation.setClosedAt(now);
+            stockReservationRepository.saveAndFlush(reservation);
+        }
+        return expired.size();
+    }
+
+    public Instant calculateExpiry(Instant createdAt) {
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
+        return createdAt.plus(Duration.ofMinutes(wmsProperties.reservation().timeoutMinutes()));
     }
 
     private StockReservationEntity getActiveReservationOrThrow(Long reservationId) {

@@ -2,6 +2,7 @@ package hu.unideb.inf.backend.controller;
 
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
 import hu.unideb.inf.core.exception.WmsBusinessException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -48,9 +49,9 @@ public class GlobalExceptionHandler {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
-    @ExceptionHandler(OptimisticLockingFailureException.class)
+    @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
     public ProblemDetail handleOptimisticLockingFailure(
-            OptimisticLockingFailureException ex,
+            Exception ex,
             HttpServletRequest request
     ) {
         return problem(
