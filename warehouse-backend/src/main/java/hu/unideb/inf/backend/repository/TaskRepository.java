@@ -17,6 +17,8 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
 
     List<TaskEntity> findByAssignedToAndStatus(Long assignedTo, TaskStatus status);
 
+    List<TaskEntity> findByAssignedToOrderByPriorityAscCreatedAtAsc(Long assignedTo);
+
     List<TaskEntity> findByDeliveryOrderId(Long deliveryOrderId);
 
     List<TaskEntity> findByTaskType(TaskType taskType);

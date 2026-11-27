@@ -1,10 +1,12 @@
 package hu.unideb.inf.backend.service.reservation;
 
 import hu.unideb.inf.backend.config.WmsProperties;
+import hu.unideb.inf.backend.model.entity.DeliveryOrderLineEntity;
 import hu.unideb.inf.backend.model.entity.InventoryItemEntity;
 import hu.unideb.inf.backend.model.entity.ProductEntity;
 import hu.unideb.inf.backend.model.entity.ShelfEntity;
 import hu.unideb.inf.backend.model.entity.StockReservationEntity;
+import hu.unideb.inf.backend.model.entity.TaskLineEntity;
 import hu.unideb.inf.backend.repository.InventoryItemRepository;
 import hu.unideb.inf.backend.repository.ProductRepository;
 import hu.unideb.inf.backend.repository.ShelfRepository;
@@ -14,6 +16,7 @@ import hu.unideb.inf.backend.service.picking.PickingStrategy;
 import hu.unideb.inf.backend.service.picking.StockLot;
 import hu.unideb.inf.core.enums.InventoryStatus;
 import hu.unideb.inf.core.enums.ReservationStatus;
+import hu.unideb.inf.core.enums.ReservationType;
 import hu.unideb.inf.core.exception.InsufficientStockException;
 import hu.unideb.inf.core.exception.ReservationConflictException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
@@ -146,6 +149,42 @@ public class StockReservationService {
         }
 
         return created;
+    }
+
+    @Transactional
+    public StockReservationEntity reserveItem(
+            InventoryItemEntity item,
+            int quantity,
+            ReservationType reservationType,
+            Long createdBy,
+            TaskLineEntity taskLine,
+            DeliveryOrderLineEntity deliveryOrderLine
+    ) {
+        Objects.requireNonNull(item, "item must not be null");
+        Objects.requireNonNull(reservationType, "reservationType must not be null");
+        Objects.requireNonNull(createdBy, "createdBy must not be null");
+
+        int available = availableQuantity(item);
+        if (quantity > available) {
+            throw new ReservationConflictException(item.getId(), quantity, available);
+        }
+
+        Instant now = Instant.now(clock);
+        item.setReservedQuantity(item.getReservedQuantity() + quantity);
+        inventoryItemRepository.saveAndFlush(item);
+
+        StockReservationEntity reservation = new StockReservationEntity(
+                item,
+                taskLine,
+                deliveryOrderLine,
+                reservationType,
+                quantity,
+                ReservationStatus.ACTIVE,
+                calculateExpiry(now),
+                createdBy
+        );
+        reservation.setCreatedAt(now);
+        return stockReservationRepository.saveAndFlush(reservation);
     }
 
     @Transactional
