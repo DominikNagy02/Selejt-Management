@@ -6,6 +6,7 @@ import hu.unideb.inf.core.exception.InvalidTaskStateException;
 import hu.unideb.inf.core.exception.ReservationConflictException;
 import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import hu.unideb.inf.core.exception.ShelfCapacityExceededException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -151,6 +152,11 @@ class GlobalExceptionHandlerTest {
                 ))
                 .andExpect(jsonPath("$.instance").value("/api/v1/test/optimistic-lock"))
                 .andExpect(jsonPath("$.timestamp").value("2026-10-20T14:30:00Z"));
+
+        mockMvc.perform(post("/api/v1/test/jpa-optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://smartwms.hu/errors/optimistic-lock-conflict"))
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test
@@ -285,6 +291,11 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/api/v1/test/optimistic-lock")
         public void optimisticLock() {
             throw new ObjectOptimisticLockingFailureException("InventoryItem", 1L);
+        }
+
+        @PostMapping("/api/v1/test/jpa-optimistic-lock")
+        public void jpaOptimisticLock() {
+            throw new OptimisticLockException("Row was updated or deleted by another transaction");
         }
 
         @PostMapping("/api/v1/inventory/validate")
