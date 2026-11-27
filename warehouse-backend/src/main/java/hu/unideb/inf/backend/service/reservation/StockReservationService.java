@@ -7,6 +7,7 @@ import hu.unideb.inf.backend.model.entity.ShelfEntity;
 import hu.unideb.inf.backend.model.entity.StockReservationEntity;
 import hu.unideb.inf.backend.repository.InventoryItemRepository;
 import hu.unideb.inf.backend.repository.ProductRepository;
+import hu.unideb.inf.backend.repository.ShelfRepository;
 import hu.unideb.inf.backend.repository.StockReservationRepository;
 import hu.unideb.inf.backend.service.picking.Allocation;
 import hu.unideb.inf.backend.service.picking.PickingStrategy;
@@ -19,6 +20,7 @@ import hu.unideb.inf.core.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +36,7 @@ public class StockReservationService {
 
     private final ProductRepository productRepository;
     private final InventoryItemRepository inventoryItemRepository;
+    private final ShelfRepository shelfRepository;
     private final StockReservationRepository stockReservationRepository;
     private final PickingStrategy pickingStrategy;
     private final WmsProperties wmsProperties;
@@ -42,6 +45,7 @@ public class StockReservationService {
     public StockReservationService(
             ProductRepository productRepository,
             InventoryItemRepository inventoryItemRepository,
+            ShelfRepository shelfRepository,
             StockReservationRepository stockReservationRepository,
             PickingStrategy pickingStrategy,
             WmsProperties wmsProperties,
@@ -52,6 +56,7 @@ public class StockReservationService {
                 inventoryItemRepository,
                 "inventoryItemRepository must not be null"
         );
+        this.shelfRepository = Objects.requireNonNull(shelfRepository, "shelfRepository must not be null");
         this.stockReservationRepository = Objects.requireNonNull(
                 stockReservationRepository,
                 "stockReservationRepository must not be null"
@@ -140,6 +145,63 @@ public class StockReservationService {
         }
 
         return created;
+    }
+
+    @Transactional
+    public StockReservationEntity release(Long reservationId) {
+        StockReservationEntity reservation = getActiveReservationOrThrow(reservationId);
+        InventoryItemEntity item = reservation.getInventoryItem();
+        int updatedReserved = Math.max(0, item.getReservedQuantity() - reservation.getQuantity());
+        item.setReservedQuantity(updatedReserved);
+        inventoryItemRepository.save(item);
+
+        reservation.setStatus(ReservationStatus.RELEASED);
+        reservation.setClosedAt(Instant.now(clock));
+        return stockReservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public StockReservationEntity consume(Long reservationId) {
+        StockReservationEntity reservation = getActiveReservationOrThrow(reservationId);
+        InventoryItemEntity item = reservation.getInventoryItem();
+        int quantity = reservation.getQuantity();
+        if (item.getQuantity() < quantity || item.getReservedQuantity() < quantity) {
+            throw new ReservationConflictException(item.getId(), quantity, availableQuantity(item));
+        }
+
+        int remainingQuantity = item.getQuantity() - quantity;
+        item.setQuantity(remainingQuantity);
+        item.setReservedQuantity(item.getReservedQuantity() - quantity);
+        if (remainingQuantity == 0) {
+            item.setStatus(InventoryStatus.DEPLETED);
+        }
+        inventoryItemRepository.save(item);
+
+        ProductEntity product = item.getLot().getProduct();
+        ShelfEntity shelf = item.getShelf();
+        BigDecimal removedWeight = product.getUnitWeightKg().multiply(BigDecimal.valueOf(quantity));
+        BigDecimal removedVolume = product.getUnitVolumeM3().multiply(BigDecimal.valueOf(quantity));
+        shelf.setCurrentWeightKg(shelf.getCurrentWeightKg().subtract(removedWeight).max(BigDecimal.ZERO));
+        shelf.setCurrentVolumeM3(shelf.getCurrentVolumeM3().subtract(removedVolume).max(BigDecimal.ZERO));
+        shelfRepository.save(shelf);
+
+        reservation.setStatus(ReservationStatus.CONSUMED);
+        reservation.setClosedAt(Instant.now(clock));
+        return stockReservationRepository.save(reservation);
+    }
+
+    private StockReservationEntity getActiveReservationOrThrow(Long reservationId) {
+        Objects.requireNonNull(reservationId, "reservationId must not be null");
+        StockReservationEntity reservation = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> ResourceNotFoundException.of("StockReservation", reservationId));
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            throw new ReservationConflictException(
+                    reservation.getInventoryItem().getId(),
+                    reservation.getQuantity(),
+                    0
+            );
+        }
+        return reservation;
     }
 
     private List<InventoryItemEntity> findEligibleItems(Long productId, Long warehouseId) {
